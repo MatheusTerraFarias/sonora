@@ -1,0 +1,38 @@
+@font-face {
+  font-family: 'Sora';
+  src: url('./fonts/Sora-Variable.ttf') format('truetype');
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+:root {
+  --navy: #09124f;
+  --royal: #16266d;
+  --blue: #4169e1;
+  --cloud: #f5f7fc;
+  --mint: #19b99a;
+  --bg: var(--navy);
+  --surface: var(--royal);
+  --text: var(--cloud);
+  --accent: var(--blue);
+  --live: var(--mint);
+  font-family: 'Sora', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Sora', system-ui, sans-serif;
+}
