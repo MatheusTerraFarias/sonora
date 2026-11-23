@@ -10,7 +10,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "icons": "node scripts/build-icons.mjs",
-    "dist": "npm run build && electron-builder --win",
+    "dist": "npm run build && electron-builder --config electron-builder.config.cjs --win",
+    "test:e2e": "npm run build && playwright test",
     "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron ./node_modules/vitest/vitest.mjs run",
     "postinstall": "electron-builder install-app-deps"
   },

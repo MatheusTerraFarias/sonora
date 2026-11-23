@@ -317,6 +317,19 @@ export function Settings(): JSX.Element {
       )}
 
       <fieldset className="settings__group">
+        <legend>{S.updatesSection}</legend>
+        <label className="settings__row settings__row--check">
+          <input
+            type="checkbox"
+            checked={settings.updatesEnabled}
+            onChange={(e) => void update({ updatesEnabled: e.target.checked })}
+          />
+          <span>{S.updates}</span>
+        </label>
+        <p className="hint">{S.updatesHelp}</p>
+      </fieldset>
+
+      <fieldset className="settings__group">
         <legend>{S.backupSection}</legend>
         <p className="hint">{S.backupHelp}</p>
         <div className="toolbar">

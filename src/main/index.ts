@@ -16,6 +16,7 @@ import { createOperatorWindow } from './windows/operatorWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
 import { createProjectionBrowserWindow } from './windows/projectionWindowFactory'
 import { cleanupRestoreLeftovers, exportBackup, restoreBackup } from './backup'
+import { initUpdater } from './updater'
 import { identifyDisplays } from './windows/identifyWindows'
 import { fetchOembed, hardenWebviews } from './youtube/session'
 import type { DisplayInfo } from '../shared/displays'
@@ -41,6 +42,9 @@ async function applyAdblock(enabled: boolean): Promise<void> {
   }
 }
 
+// pasta de dados alternativa (teste de fumaça); só vale quando definida
+if (process.env.SONORA_USER_DATA) app.setPath('userData', process.env.SONORA_USER_DATA)
+
 app.whenReady().then(() => {
   let operatorWin: BrowserWindow | null = null
   hardenWebviews((embedder) => !!operatorWin && !operatorWin.isDestroyed() && embedder === operatorWin.webContents)
@@ -61,6 +65,9 @@ app.whenReady().then(() => {
   const bundledBible = app.isPackaged ? join(process.resourcesPath, 'bible') : join(app.getAppPath(), 'resources/bible')
   const bible = createBibleStore(join(dir, 'bible'), [bundledBible])
   handle('bible:translations', () => bible.translations())
+  if (process.env.SONORA_LOG_BIBLE) {
+    void Promise.resolve(bible.translations()).then((t) => console.log('[sonora] traduções:', JSON.stringify(t)))
+  }
   handle('bible:importTranslation', async (file?: string) => {
     let path = file
     if (!path) {
@@ -121,6 +128,7 @@ app.whenReady().then(() => {
   settings.onChange((s) => {
     broadcast('settings:changed', s)
   })
+  initUpdater(settings.get())
   let adblockOn = settings.get().adblockEnabled
   if (adblockOn) void applyAdblock(true)
   settings.onChange((s) => {

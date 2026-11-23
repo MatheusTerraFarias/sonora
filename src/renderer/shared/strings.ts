@@ -229,6 +229,9 @@ export const strings = {
     adblock: 'Ativar bloqueador de anúncios',
     adblockWarning:
       'Bloquear anúncios vai contra os termos de uso do YouTube. As alternativas oficiais são o YouTube Premium e o uso de mídias locais (vídeos importados na biblioteca).',
+    updatesSection: 'Atualizações',
+    updates: 'Atualizações automáticas',
+    updatesHelp: 'Quando ligado, o Sonora procura uma versão nova ao ser aberto (precisa de internet). Desligado, não acessa a internet para isso.',
     backupSection: 'Backup e restauração',
     backupHelp: 'O backup inclui músicas, cultos, mídias, Bíblias importadas e configurações.',
     export: 'Exportar backup',
