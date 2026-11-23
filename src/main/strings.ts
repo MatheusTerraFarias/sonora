@@ -7,5 +7,8 @@ export const strings = {
   media: {
     importTitle: 'Importar mídias',
     filterName: 'Imagens, vídeos e áudios'
+  },
+  services: {
+    removedItem: 'Item removido'
   }
 }

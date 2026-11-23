@@ -7,8 +7,10 @@ import { createSongsRepo, type SongInput } from './repos/songs'
 import { createBibleStore } from './bible/bibleStore'
 import { createMediaRepo, MEDIA_EXTENSIONS } from './repos/media'
 import { handleMediaProtocol, registerMediaScheme } from './media/protocol'
+import { createServicesRepo, resolveItem } from './repos/services'
+import { createFavoritesRepo, type YoutubeFavorite } from './repos/favorites'
 import { strings } from './strings'
-import type { MediaKind } from '../shared/types'
+import type { MediaKind, ServiceItemData } from '../shared/types'
 
 registerMediaScheme()
 
@@ -92,6 +94,29 @@ app.whenReady().then(() => {
     if (r.canceled) return []
     return r.filePaths.map((p) => media.importFile(p))
   })
+  const services = createServicesRepo(db)
+  handle('services:list', () => services.list())
+  handle('services:get', (id: string) => services.get(id))
+  handle('services:create', (name: string, date: string) => services.create(name, date))
+  handle('services:rename', (id: string, name: string, date: string) => services.rename(id, name, date))
+  handle('services:duplicate', (id: string, newDate: string) => services.duplicate(id, newDate))
+  handle('services:remove', (id: string) => services.remove(id))
+  handle('services:addItem', (serviceId: string, data: ServiceItemData, position?: number) =>
+    services.addItem(serviceId, data, position)
+  )
+  handle('services:updateItem', (itemId: string, data: ServiceItemData) => services.updateItem(itemId, data))
+  handle('services:moveItem', (itemId: string, toPosition: number) => services.moveItem(itemId, toPosition))
+  handle('services:removeItem', (itemId: string) => services.removeItem(itemId))
+  handle('services:resolve', (serviceId: string) => {
+    const s = services.get(serviceId)
+    if (!s) return []
+    const deps = { songs, media }
+    return s.items.map((i) => resolveItem(i, deps))
+  })
+  const favorites = createFavoritesRepo(db)
+  handle('favorites:list', () => favorites.list())
+  handle('favorites:add', (v: YoutubeFavorite) => favorites.add(v))
+  handle('favorites:remove', (videoId: string) => favorites.remove(videoId))
   createOperatorWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createOperatorWindow()

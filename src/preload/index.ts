@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ID, MediaItem, MediaKind, Song } from '../shared/types'
+import type { ID, MediaItem, MediaKind, ResolvedItem, Service, ServiceItem, ServiceItemData, Song } from '../shared/types'
 import type { SongInput } from '../main/repos/songs'
 import type { TranslationInfo } from '../main/bible/bibleStore'
+import type { YoutubeFavorite } from '../main/repos/favorites'
 import type { Passage } from '../shared/slides'
 
 const call =
@@ -42,6 +43,25 @@ export const api = {
     remove: call('media:remove') as (id: ID) => Promise<void>,
     /** abre o seletor (várias seleções); [] se cancelado */
     pickAndImport: call('media:pickAndImport') as () => Promise<MediaItem[]>
+  },
+  services: {
+    list: call('services:list') as () => Promise<Omit<Service, 'items'>[]>,
+    get: call('services:get') as (id: ID) => Promise<Service | null>,
+    create: call('services:create') as (name: string, date: string) => Promise<Service>,
+    rename: call('services:rename') as (id: ID, name: string, date: string) => Promise<Service>,
+    duplicate: call('services:duplicate') as (id: ID, newDate: string) => Promise<Service>,
+    remove: call('services:remove') as (id: ID) => Promise<void>,
+    addItem: call('services:addItem') as (serviceId: ID, data: ServiceItemData, position?: number) => Promise<ServiceItem>,
+    updateItem: call('services:updateItem') as (itemId: ID, data: ServiceItemData) => Promise<ServiceItem>,
+    moveItem: call('services:moveItem') as (itemId: ID, toPosition: number) => Promise<Service>,
+    removeItem: call('services:removeItem') as (itemId: ID) => Promise<void>,
+    /** itens do culto resolvidos para exibição (título, `missing`) */
+    resolve: call('services:resolve') as (serviceId: ID) => Promise<ResolvedItem[]>
+  },
+  favorites: {
+    list: call('favorites:list') as () => Promise<YoutubeFavorite[]>,
+    add: call('favorites:add') as (v: YoutubeFavorite) => Promise<void>,
+    remove: call('favorites:remove') as (videoId: string) => Promise<void>
   },
   /** Assina um evento enviado pelo main. Retorna a função de cancelamento. */
   on(channel: string, cb: (...args: any[]) => void): () => void {
