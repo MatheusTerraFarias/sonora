@@ -16,6 +16,7 @@ import { strings } from './strings'
 import { createOperatorWindow } from './windows/operatorWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
 import { createProjectionBrowserWindow } from './windows/projectionWindowFactory'
+import { isAppUrl } from './windows/navigationGuard'
 import { cleanupRestoreLeftovers, exportBackup, restoreBackup } from './backup'
 import { initUpdater } from './updater'
 import { identifyDisplays } from './windows/identifyWindows'
@@ -50,7 +51,72 @@ if (process.env.SONORA_USER_DATA && (!app.isPackaged || process.env.SONORA_ALLOW
   app.setPath('userData', process.env.SONORA_USER_DATA)
 }
 
-app.whenReady().then(() => {
+/** janela do operador (para trazer à frente quando o Sonora é aberto de novo) */
+let operatorWindow: BrowserWindow | null = null
+
+/**
+ * Janelas do app (operador, telão) só mostram o próprio renderer: arquivo solto na janela,
+ * link ou redirecionamento para fora são cancelados; pop-ups também (o operador libera
+ * os seus pelo próprio handler). As <webview> têm regras próprias (hardenWebviews).
+ */
+function guardAppNavigation(): void {
+  const devUrl = process.env['ELECTRON_RENDERER_URL'] ?? null
+  const rendererDir = join(__dirname, '../renderer')
+  app.on('web-contents-created', (_e, contents) => {
+    // só janelas (webview e DevTools ficam de fora)
+    if (contents.getType() !== 'window') return
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    contents.on('will-navigate', (event) => {
+      if (!isAppUrl(event.url, devUrl, rendererDir)) event.preventDefault()
+    })
+    contents.on('will-redirect', (event) => {
+      if (event.isMainFrame && !isAppUrl(event.url, devUrl, rendererDir)) event.preventDefault()
+    })
+  })
+}
+
+/** falha ao iniciar (banco corrompido ou travado, migração): avisa e encerra, nada fica pendurado */
+function failStartup(err: unknown): void {
+  console.error('[sonora] falha ao iniciar:', err)
+  let dir = ''
+  try {
+    dir = app.getPath('userData')
+  } catch {
+    // sem pasta conhecida
+  }
+  try {
+    dialog.showErrorBox(strings.startup.failedTitle, strings.startup.failedMessage(dir, err instanceof Error ? err.message : String(err)))
+  } finally {
+    app.exit(1)
+  }
+}
+
+// uma instância só: abrir o Sonora de novo traz a janela do operador à frente
+// (o bloqueio vale por pasta de dados, por isso vem depois de SONORA_USER_DATA)
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const w = operatorWindow
+    if (!w || w.isDestroyed()) return
+    if (w.isMinimized()) w.restore()
+    if (!w.isVisible()) w.show()
+    w.focus()
+  })
+  guardAppNavigation()
+  app
+    .whenReady()
+    .then(() => {
+      try {
+        start()
+      } catch (err) {
+        failStartup(err)
+      }
+    })
+    .catch(failStartup)
+}
+
+function start(): void {
   let operatorWin: BrowserWindow | null = null
   hardenWebviews((embedder) => !!operatorWin && !operatorWin.isDestroyed() && embedder === operatorWin.webContents)
   const dir = app.getPath('userData')
@@ -169,6 +235,7 @@ app.whenReady().then(() => {
   app.on('before-quit', () => connectivity.stop())
   const opWin = createOperatorWindow()
   operatorWin = opWin
+  operatorWindow = opWin
   opWin.on('closed', () => app.quit())
   // progresso de reprodução informado pelo telão: só repassado ao operador (não altera LiveState.position)
   ipcMain.on('live:progress', (event, p: LiveProgress) => {
@@ -260,10 +327,15 @@ app.whenReady().then(() => {
     app.exit()
     return true
   })
-  /** sincroniza o telão e avisa o operador da nova lista de monitores */
+  /** sincroniza o telão e avisa o operador quando a lista de monitores (ou qual é o do operador) mudou */
+  let lastDisplays = ''
   const syncProjection = (): void => {
     projection.sync()
-    broadcast('displays:changed', listDisplays())
+    const list = listDisplays()
+    const key = JSON.stringify(list)
+    if (key === lastDisplays) return
+    lastDisplays = key
+    broadcast('displays:changed', list)
   }
   let lastSaved = settings.get().projectionDisplayId
   settings.onChange((s) => {
@@ -278,7 +350,7 @@ app.whenReady().then(() => {
   opWin.on('moved', () => syncProjection())
   syncProjection()
   app.on('before-quit', () => projection.destroy())
-})
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
