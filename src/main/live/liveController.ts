@@ -1,6 +1,6 @@
 import type { ID, LiveContent, LiveState, MediaItem, Overlay, ResolvedItem, Service, Settings, Slide } from '../../shared/types'
 import { buildSlides, type SlideDeps } from '../../shared/slides'
-import { nextPosition, prevPosition } from '../../shared/navigation'
+import { nextFromCursor, prevFromCursor } from '../../shared/navigation'
 import { resolveItem, type ResolveDeps } from '../repos/services'
 
 export interface LiveDeps extends SlideDeps {
@@ -20,6 +20,7 @@ interface Entry {
 export class LiveController {
   private state: LiveState
   private entries: Entry[] = []
+  private serviceId: ID | null = null
   private online = true
   private subscribers = new Set<(s: LiveState) => void>()
 
@@ -55,16 +56,69 @@ export class LiveController {
     for (const cb of this.subscribers) cb(this.state)
   }
 
-  private skipOf(e: { resolved: ResolvedItem }): boolean {
-    return e.resolved.missing || (e.resolved.item.data.kind === 'youtube' && !this.online)
+  /** ausente, YouTube sem internet, ou música/Bíblia sem nenhum slide */
+  private skipOf(e: { resolved: ResolvedItem; slides: Slide[] }): boolean {
+    const kind = e.resolved.item.data.kind
+    return (
+      e.resolved.missing ||
+      (kind === 'youtube' && !this.online) ||
+      ((kind === 'song' || kind === 'bible') && e.slides.length === 0)
+    )
   }
 
+  /**
+   * (Re)carrega o culto. O telão nunca muda sozinho por causa disso, exceto quando o texto do
+   * que está no ar foi editado (retransmite o slide novo, com o índice ajustado).
+   * - mesmo culto, item ao vivo ainda existe: cursor mantido;
+   * - mesmo culto, item ao vivo removido: cursor sem item, com `gap` na posição que ele ocupava;
+   * - outro culto: cursor sem posição; o conteúdo atual fica até o operador navegar.
+   */
   loadService(serviceId: ID): void {
     const svc = this.deps.services.get(serviceId)
+    const oldIndex = this.indexOf(this.state.cursor.itemId)
     this.entries = (svc?.items ?? []).map((item) => {
       const resolved = resolveItem(item, this.deps.resolveDeps)
-      return { resolved, slides: buildSlides(resolved, this.deps), skip: this.skipOf({ resolved }) }
+      const slides = buildSlides(resolved, this.deps)
+      return { resolved, slides, skip: this.skipOf({ resolved, slides }) }
     })
+    const sameService = this.serviceId === serviceId
+    this.serviceId = serviceId
+    const cur = this.state.cursor
+    if (!sameService) {
+      if (cur.itemId !== null || cur.gap !== undefined) this.setCursor({ itemId: null, slideIndex: 0 })
+      return
+    }
+    if (cur.itemId === null) return
+    const idx = this.indexOf(cur.itemId)
+    if (idx < 0) {
+      this.setCursor({ itemId: null, slideIndex: 0, gap: oldIndex < 0 ? 0 : oldIndex })
+      return
+    }
+    const e = this.entries[idx]
+    // sem slides válidos agora (ex.: música apagada): o telão fica como está até navegar
+    if (e.skip) return
+    const slideIndex = Math.min(cur.slideIndex, Math.max(1, e.slides.length) - 1)
+    const content = this.state.content
+    const fresh = this.contentFor(e, slideIndex)
+    // só texto é retransmitido; mídia/YouTube no ar seguem tocando como estão
+    const textChanged =
+      content.type === 'slide' && fresh.type === 'slide' && JSON.stringify(content.slide) !== JSON.stringify(fresh.slide)
+    if (!textChanged && slideIndex === cur.slideIndex) return
+    this.state = {
+      ...this.state,
+      content: textChanged ? fresh : content,
+      cursor: { itemId: cur.itemId, slideIndex }
+    }
+    this.emit()
+  }
+
+  private indexOf(itemId: ID | null): number {
+    return itemId === null ? -1 : this.entries.findIndex((e) => e.resolved.item.id === itemId)
+  }
+
+  private setCursor(cursor: LiveState['cursor']): void {
+    this.state = { ...this.state, cursor }
+    this.emit()
   }
 
   /** itens do culto carregado com seus slides (para a grade e a prévia do operador) */
@@ -77,8 +131,13 @@ export class LiveController {
     for (const e of this.entries) e.skip = this.skipOf(e)
   }
 
+  /** mídia apagada depois do carregamento também é pulada (goTo nela seria ignorado) */
   private nav() {
-    return this.entries.map((e) => ({ slideCount: e.slides.length, skip: e.skip }))
+    return this.entries.map((e) => {
+      const d = e.resolved.item.data
+      const gone = d.kind === 'media' && !this.deps.media.get(d.mediaId)
+      return { slideCount: e.slides.length, skip: e.skip || gone }
+    })
   }
 
   private contentFor(e: Entry, slideIndex: number): LiveContent {
@@ -92,38 +151,31 @@ export class LiveController {
     return slide ? { type: 'slide', slide } : { type: 'none' }
   }
 
+  /** ignorado se o item não existe, deve ser pulado ou não teria nada a mostrar (nunca tela vazia) */
   goTo(itemId: ID, slideIndex: number): void {
-    const idx = this.entries.findIndex((e) => e.resolved.item.id === itemId)
+    const idx = this.indexOf(itemId)
     if (idx < 0 || this.entries[idx].skip) return
     const e = this.entries[idx]
     const last = Math.max(1, e.slides.length) - 1
     const slide = Math.max(0, Math.min(Math.trunc(slideIndex) || 0, last))
-    this.state = { ...this.state, content: this.contentFor(e, slide), cursor: { itemId, slideIndex: slide } }
+    const content = this.contentFor(e, slide)
+    if (content.type === 'none') return
+    this.state = { ...this.state, content, cursor: { itemId, slideIndex: slide } }
     this.emit()
   }
 
-  private step(fn: typeof nextPosition): void {
-    const items = this.nav()
+  private step(fn: typeof nextFromCursor): void {
     const cur = this.state.cursor
-    const at = cur.itemId === null ? -1 : this.entries.findIndex((e) => e.resolved.item.id === cur.itemId)
-    let pos
-    if (at < 0) {
-      // sem posição atual: avançar vai ao primeiro item válido; voltar não faz nada
-      if (fn !== nextPosition) return
-      const first = items.findIndex((i) => !i.skip)
-      pos = first < 0 ? null : { item: first, slide: 0 }
-    } else {
-      pos = fn(items, { item: at, slide: cur.slideIndex })
-    }
+    const pos = fn(this.nav(), this.indexOf(cur.itemId), cur.slideIndex, cur.gap ?? null)
     if (pos) this.goTo(this.entries[pos.item].resolved.item.id, pos.slide)
   }
 
   next(): void {
-    this.step(nextPosition)
+    this.step(nextFromCursor)
   }
 
   prev(): void {
-    this.step(prevPosition)
+    this.step(prevFromCursor)
   }
 
   setOverlay(overlay: Overlay): void {

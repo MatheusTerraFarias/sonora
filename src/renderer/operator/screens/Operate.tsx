@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ID, LiveProgress, LiveState, MediaItem, Overlay, ResolvedItem, Slide, SongAttachment } from '../../../shared/types'
 import type { DisplayInfo } from '../../../shared/displays'
 import { pickProjectionDisplay } from '../../../shared/displays'
-import { nextPosition } from '../../../shared/navigation'
+import { nextFromCursor } from '../../../shared/navigation'
 import { strings } from '../../shared/strings'
 import { EmergencyBar } from '../components/EmergencyBar'
 import { MediaControls } from '../components/MediaControls'
@@ -157,13 +157,8 @@ export function Operate(): JSX.Element {
   const next = useMemo((): NextPreview => {
     const nav = outline.map((o) => ({ slideCount: o.slides.length, skip: o.skip }))
     const at = cursorId ? outline.findIndex((o) => o.itemId === cursorId) : -1
-    let pos
-    if (at < 0) {
-      const first = nav.findIndex((n) => !n.skip)
-      pos = first < 0 ? null : { item: first, slide: 0 }
-    } else {
-      pos = nextPosition(nav, { item: at, slide: live?.cursor.slideIndex ?? 0 })
-    }
+    // mesma regra do main: sem item ao vivo, continua da lacuna deixada por um item removido
+    const pos = nextFromCursor(nav, at, live?.cursor.slideIndex ?? 0, live?.cursor.gap ?? null)
     if (!pos) return { kind: 'end' }
     const entry = outline[pos.item]
     const slide = entry.slides[pos.slide]
@@ -188,11 +183,19 @@ export function Operate(): JSX.Element {
   const liveProgress = progress && progress.key === liveKey ? progress : null
   const selectedOffline = selData?.kind === 'youtube' && !online
 
+  const emergency = <EmergencyBar overlay={live?.overlay ?? 'none'} monitorLabel={projection} onOverlay={overlayOf} />
+
+  // sem culto escolhido os botões de emergência continuam à mão
   if (!serviceId) {
     return (
-      <section className="screen">
-        <h1 className="screen__title">{strings.operation.title}</h1>
-        <p className="hint">{strings.operation.noService}</p>
+      <section className="operate">
+        <div className="operate__header">
+          <h1 className="screen__title">{strings.operation.title}</h1>
+          <ErrorBanner show={safe.error} />
+          <p className="hint">{strings.operation.noService}</p>
+        </div>
+        <div className="operate__body" />
+        {emergency}
       </section>
     )
   }
@@ -283,7 +286,7 @@ export function Operate(): JSX.Element {
 
         {live && <PreviewPanel live={live} next={next} progress={liveProgress} />}
       </div>
-      <EmergencyBar overlay={live?.overlay ?? 'none'} monitorLabel={projection} onOverlay={overlayOf} />
+      {emergency}
     </section>
   )
 }

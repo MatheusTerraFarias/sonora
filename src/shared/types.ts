@@ -107,7 +107,11 @@ export interface LiveState {
   background: Background;
   style: TextStyle;
   logoMediaId: ID | null;
-  cursor: { itemId: ID | null; slideIndex: number };
+  /**
+   * `gap`: o item ao vivo foi removido do culto; posição que ele ocupava (avançar/voltar continuam dali).
+   * O telão mantém o conteúdo até o operador navegar.
+   */
+  cursor: { itemId: ID | null; slideIndex: number; gap?: number };
 }
 
 export interface Settings {
