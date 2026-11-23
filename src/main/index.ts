@@ -15,6 +15,8 @@ import { strings } from './strings'
 import { createOperatorWindow } from './windows/operatorWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
 import { createProjectionBrowserWindow } from './windows/projectionWindowFactory'
+import { exportBackup, restoreBackup } from './backup'
+import { identifyDisplays } from './windows/identifyWindows'
 import { fetchOembed, hardenWebviews } from './youtube/session'
 import type { DisplayInfo } from '../shared/displays'
 import type { LiveProgress, LiveState, MediaKind, Overlay, ServiceItemData, Settings } from '../shared/types'
@@ -175,6 +177,58 @@ app.whenReady().then(() => {
     }))
   }
   handle('displays:list', listDisplays)
+  handle('displays:identify', () =>
+    identifyDisplays(screen.getAllDisplays().map((d, i) => ({ number: i + 1, bounds: d.bounds })))
+  )
+  const stamp = (): string => new Date().toISOString().slice(0, 10)
+  handle('backup:export', async () => {
+    if (!db) return null
+    const r = await dialog.showSaveDialog({
+      title: strings.backup.exportTitle,
+      defaultPath: `sonora-backup-${stamp()}.sonora`,
+      filters: [{ name: strings.backup.filterName, extensions: ['sonora'] }]
+    })
+    if (r.canceled || !r.filePath) return null
+    await exportBackup(db, dir, r.filePath, app.getVersion())
+    return r.filePath
+  })
+  handle('backup:restore', async () => {
+    const r = await dialog.showOpenDialog({
+      title: strings.backup.restoreTitle,
+      filters: [{ name: strings.backup.filterName, extensions: ['sonora'] }],
+      properties: ['openFile']
+    })
+    const file = r.filePaths[0]
+    if (r.canceled || !file) return false
+    const c = await dialog.showMessageBox({
+      type: 'warning',
+      title: strings.backup.confirmTitle,
+      message: strings.backup.confirmMessage,
+      detail: strings.backup.confirmDetail,
+      buttons: [strings.backup.confirmYes, strings.backup.confirmNo],
+      defaultId: 1,
+      cancelId: 1
+    })
+    if (c.response !== 0) return false
+    try {
+      await restoreBackup(file, dir, {
+        beforeSwap: () => {
+          db?.close()
+          db = null
+        }
+      })
+    } catch (err) {
+      // banco já fechado (falha na troca, que se desfaz sozinha): reinicia para reabrir os dados antigos
+      if (!db) {
+        app.relaunch()
+        app.exit()
+      }
+      throw err
+    }
+    app.relaunch()
+    app.exit()
+    return true
+  })
   /** sincroniza o telão e avisa o operador da nova lista de monitores */
   const syncProjection = (): void => {
     projection.sync()

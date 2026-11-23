@@ -27,7 +27,7 @@ function on(channel: string, cb: (...args: any[]) => void): () => void {
  */
 export const api = {
   app: {
-    version: call('app:version')
+    version: call('app:version') as () => Promise<string>
   },
   songs: {
     list: call('songs:list') as (query?: string) => Promise<Song[]>,
@@ -107,7 +107,15 @@ export const api = {
   displays: {
     list: call('displays:list') as () => Promise<DisplayInfo[]>,
     /** recebe a lista completa quando monitores mudam; retorna o cancelamento */
-    onChange: (cb: (d: DisplayInfo[]) => void): (() => void) => on('displays:changed', cb)
+    onChange: (cb: (d: DisplayInfo[]) => void): (() => void) => on('displays:changed', cb),
+    /** mostra um número grande em cada monitor por 3 s */
+    identify: call('displays:identify') as () => Promise<void>
+  },
+  backup: {
+    /** abre o seletor de destino; null se cancelado, senão o caminho gravado */
+    export: call('backup:export') as () => Promise<string | null>,
+    /** abre o seletor, pede confirmação e reinicia o app; false se cancelado */
+    restore: call('backup:restore') as () => Promise<boolean>
   },
   on
 }

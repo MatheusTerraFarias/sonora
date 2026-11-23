@@ -11,6 +11,16 @@ export const strings = {
   displays: {
     monitor: (n: number, w: number, h: number) => `Monitor ${n} (${w}×${h})`
   },
+  backup: {
+    exportTitle: 'Exportar backup',
+    restoreTitle: 'Restaurar backup',
+    filterName: 'Backup do Sonora',
+    confirmTitle: 'Restaurar backup',
+    confirmMessage: 'Restaurar este backup vai substituir todos os dados atuais (músicas, cultos, mídias e Bíblias).',
+    confirmDetail: 'O Sonora será reiniciado. Esta ação não pode ser desfeita.',
+    confirmYes: 'Restaurar e reiniciar',
+    confirmNo: 'Cancelar'
+  },
   services: {
     removedItem: 'Item removido'
   }

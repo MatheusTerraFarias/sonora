@@ -1,0 +1,51 @@
+.settings {
+  max-width: 760px;
+}
+.settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(245, 247, 252, 0.15);
+  border-radius: 10px;
+}
+.settings__group legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.settings__row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.settings__row--check {
+  display: flex;
+  gap: 8px;
+}
+.settings__row input[type='color'] {
+  width: 56px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.settings__sub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.settings__licenses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings__licenses li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

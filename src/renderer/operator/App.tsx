@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
-import { strings } from '../shared/strings'
 import { Sidebar } from './components/Sidebar'
 import { Bible } from './screens/Bible'
-import { ComingSoon } from './screens/ComingSoon'
+import { Settings } from './screens/Settings'
 import { Media } from './screens/Media'
 import { Notices } from './screens/Notices'
 import { Operate } from './screens/Operate'
@@ -28,9 +27,8 @@ function Screen({ section }: { section: Section }): JSX.Element {
       return <Operate />
     case 'youtube':
       return <YouTube />
-    default:
-      // a Task 14 substitui este marcador
-      return <ComingSoon title={strings.nav[section]} />
+    case 'settings':
+      return <Settings />
   }
 }
 
