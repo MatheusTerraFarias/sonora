@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ID, LiveProgress, LiveState, MediaItem, Overlay, ResolvedItem, Slide, SongAttachment } from '../../../shared/types'
-import type { DisplayInfo } from '../../../shared/displays'
-import { pickProjectionDisplay } from '../../../shared/displays'
 import { nextFromCursor } from '../../../shared/navigation'
 import { strings } from '../../shared/strings'
-import { EmergencyBar } from '../components/EmergencyBar'
-import { MediaControls } from '../components/MediaControls'
-import { PreviewPanel, type NextPreview } from '../components/PreviewPanel'
-import { SlideGrid } from '../components/SlideGrid'
-import { ErrorBanner, useSafe } from '../components/useSafe'
+import { EmergencyBar } from '../components/operate/EmergencyBar'
+import { MediaControls } from '../components/operate/MediaControls'
+import { NextMonitor, ProgramMonitor, type NextPreview } from '../components/operate/Monitors'
+import { RunOfShow, kindIcon } from '../components/operate/RunOfShow'
+import { SlideTiles } from '../components/operate/SlideTiles'
+import { Button } from '../components/ui/Button'
+import { EmptyState, Notice } from '../components/ui/EmptyState'
+import { MediaCard } from '../components/ui/Monitor'
+import { PanelHeader } from '../components/ui/PanelHeader'
+import { SlideCanvas } from '../components/ui/SlideCanvas'
+import { mediaUrl } from '../components/MediaThumb'
+import { useSafe } from '../components/useSafe'
 import { useOperatorStore } from '../store'
 import type { ShortcutAction } from '../shortcuts'
 import { useShortcuts } from '../useShortcuts'
-import '../components/Operate.css'
+import './Operate.css'
 
 interface OutlineEntry {
   itemId: ID
@@ -20,38 +25,31 @@ interface OutlineEntry {
   slides: Slide[]
 }
 
-/** Operação ao vivo: ordem do culto, grade de slides, prévia/ao vivo e botões de emergência. */
+/** Operação ao vivo: ordem do culto, slides do item, monitores Próximo/No telão e teclas de emergência. */
 export function Operate(): JSX.Element {
   const serviceId = useOperatorStore((s) => s.currentServiceId)
   const online = useOperatorStore((s) => s.onlineStatus)
+  const setSection = useOperatorStore((s) => s.setSection)
   const [progress, setProgress] = useState<LiveProgress | null>(null)
   const [items, setItems] = useState<ResolvedItem[]>([])
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [attachments, setAttachments] = useState<Record<ID, SongAttachment>>({})
   const [library, setLibrary] = useState<MediaItem[]>([])
   const [live, setLive] = useState<LiveState | null>(null)
-  const [displays, setDisplays] = useState<DisplayInfo[]>([])
-  const [savedDisplayId, setSavedDisplayId] = useState<number | null>(null)
   const [selectedId, setSelectedId] = useState<ID | null>(null)
   const [attachmentError, setAttachmentError] = useState(false)
   const safe = useSafe()
   const run = safe.run
   const seq = useRef(0)
 
-  // estado ao vivo, monitores e configurações (assinaturas)
+  // estado ao vivo, progresso e biblioteca (assinaturas)
   useEffect(() => {
     void run(() => window.sonora.live.get()).then((r) => r.ok && setLive((cur) => cur ?? r.value))
     const offLive = window.sonora.live.onState(setLive)
-    void run(() => window.sonora.displays.list()).then((r) => r.ok && setDisplays(r.value))
-    const offDisplays = window.sonora.displays.onChange(setDisplays)
-    void run(() => window.sonora.settings.get()).then((r) => r.ok && setSavedDisplayId(r.value.projectionDisplayId))
-    const offSettings = window.sonora.settings.onChange((s) => setSavedDisplayId(s.projectionDisplayId))
     const offProgress = window.sonora.live.onProgress(setProgress)
     void run(() => window.sonora.media.list()).then((r) => r.ok && setLibrary(r.value))
     return () => {
       offLive()
-      offDisplays()
-      offSettings()
       offProgress()
     }
   }, [run])
@@ -149,144 +147,211 @@ export function Operate(): JSX.Element {
     await run(() => window.sonora.live.goTo(itemId, 0))
   }
 
-  const projection = useMemo(() => {
-    const id = pickProjectionDisplay(displays, savedDisplayId, displays.find((d) => d.isOperator)?.id ?? -1)
-    return id === null ? null : (displays.find((d) => d.id === id)?.label ?? null)
-  }, [displays, savedDisplayId])
-
-  const next = useMemo((): NextPreview => {
+  // próxima posição (mesma regra do main): alimenta o monitor "Próximo" e a moldura Âmbar
+  const cue = useMemo((): { next: NextPreview; itemId: ID | null; slide: number } => {
     const nav = outline.map((o) => ({ slideCount: o.slides.length, skip: o.skip }))
     const at = cursorId ? outline.findIndex((o) => o.itemId === cursorId) : -1
-    // mesma regra do main: sem item ao vivo, continua da lacuna deixada por um item removido
+    // sem item ao vivo, continua da lacuna deixada por um item removido
     const pos = nextFromCursor(nav, at, live?.cursor.slideIndex ?? 0, live?.cursor.gap ?? null)
-    if (!pos) return { kind: 'end' }
+    if (!pos) return { next: { kind: 'end' }, itemId: null, slide: -1 }
     const entry = outline[pos.item]
     const slide = entry.slides[pos.slide]
-    if (slide) return { kind: 'slide', slide }
+    if (slide) return { next: { kind: 'slide', slide }, itemId: entry.itemId, slide: pos.slide }
     const r = items.find((i) => i.item.id === entry.itemId)
     const d = r?.item.data
     return {
-      kind: 'media',
-      media: d?.kind === 'media' ? (library.find((m) => m.id === d.mediaId) ?? null) : null,
-      title: r?.title ?? ''
+      next: {
+        kind: 'media',
+        media: d?.kind === 'media' ? (library.find((m) => m.id === d.mediaId) ?? null) : null,
+        title: r?.title ?? '',
+        thumbnail: d?.kind === 'youtube' ? d.thumbnail : null
+      },
+      itemId: entry.itemId,
+      slide: pos.slide
     }
   }, [outline, items, library, cursorId, live])
+
+  const slideCounts = useMemo(() => Object.fromEntries(outline.map((o) => [o.itemId, o.slides.length])), [outline])
 
   const liveContent = live?.content
   const selectedIsLive = !!selected && cursorId === selected.item.id
   const selData = selected?.item.data
   const isMediaItem = selData?.kind === 'media' || selData?.kind === 'youtube'
-  const mediaLive =
-    selectedIsLive && (liveContent?.type === 'media' || liveContent?.type === 'youtube') ? liveContent : null
+  const mediaLive = liveContent?.type === 'media' || liveContent?.type === 'youtube' ? liveContent : null
   const liveKey =
     liveContent?.type === 'media' ? liveContent.media.id : liveContent?.type === 'youtube' ? liveContent.videoId : null
   const liveProgress = progress && progress.key === liveKey ? progress : null
   const selectedOffline = selData?.kind === 'youtube' && !online
+  const liveTitle = items.find((r) => r.item.id === cursorId)?.title ?? null
 
-  const emergency = <EmergencyBar overlay={live?.overlay ?? 'none'} monitorLabel={projection} onOverlay={overlayOf} />
+  const selectedMedia = selData?.kind === 'media' ? (library.find((m) => m.id === selData.mediaId) ?? null) : null
 
-  // sem culto escolhido os botões de emergência continuam à mão
-  if (!serviceId) {
-    return (
-      <section className="operate">
-        <div className="operate__header">
-          <h1 className="screen__title">{strings.operation.title}</h1>
-          <ErrorBanner show={safe.error} />
-          <p className="hint">{strings.operation.noService}</p>
+  const center = ((): JSX.Element => {
+    if (!serviceId) {
+      return (
+        <div className="operate__center-empty">
+          <EmptyState
+            icon="services"
+            title={strings.operation.noServiceTitle}
+            text={strings.operation.noServiceHint}
+            action={
+              <Button variant="primary" onClick={() => setSection('services')}>
+                {strings.shell.pickService}
+              </Button>
+            }
+          />
         </div>
-        <div className="operate__body" />
-        {emergency}
-      </section>
+      )
+    }
+    if (!selected) {
+      return (
+        <div className="operate__center-empty">
+          <EmptyState icon="services" title={strings.operation.emptyService} text={strings.operation.pickItem} />
+        </div>
+      )
+    }
+    const header = (
+      <PanelHeader
+        title={selected.missing ? strings.operation.removedItem : selected.title}
+        meta={
+          selected.missing
+            ? undefined
+            : `${strings.services.kind[selected.item.data.kind]}${selectedOutline && selectedOutline.slides.length > 0 ? ` · ${strings.songs.slideCount(selectedOutline.slides.length)}` : ''}`
+        }
+      />
     )
-  }
+    if (selected.missing) {
+      return (
+        <>
+          {header}
+          <div className="operate__scroll">
+            <EmptyState icon="alert" title={strings.operation.removedItem} compact />
+          </div>
+        </>
+      )
+    }
+    if (isMediaItem) {
+      return (
+        <>
+          {header}
+          <div className="operate__scroll">
+            <div className="operate__media">
+              <button
+                type="button"
+                className={selectedIsLive ? 'tile tile--live tile--wide' : 'tile tile--wide'}
+                disabled={selectedOffline}
+                onClick={() => goTo(selected.item.id, 0)}
+                aria-label={`${strings.operation.project}: ${selected.title}`}
+              >
+                <span className="tile__screen">
+                  {live && (
+                    <SlideCanvas background={live.background} style={live.style} bare>
+                      {selectedMedia?.kind === 'image' ? (
+                        <img className="stage-image" src={mediaUrl(selectedMedia.id)} alt="" draggable={false} />
+                      ) : (
+                        <MediaCard
+                          icon={kindIcon(selected.item.data, library)}
+                          title={selected.title}
+                          thumb={selData?.kind === 'youtube' ? selData.thumbnail : null}
+                        />
+                      )}
+                    </SlideCanvas>
+                  )}
+                  {selectedIsLive && <span className="tile__tag tile__tag--live">{strings.operation.liveTag}</span>}
+                </span>
+              </button>
+              <div className="inline-actions">
+                <Button variant="primary" size="lg" icon="play" disabled={selectedOffline} onClick={() => goTo(selected.item.id, 0)}>
+                  {strings.operation.project}
+                </Button>
+                {selectedOffline ? (
+                  <Notice tone="warn">{strings.operation.offline}</Notice>
+                ) : (
+                  <span className="hint">{strings.operation.mediaItemHint}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )
+    }
+    return (
+      <>
+        {header}
+        <div className="operate__scroll">
+          {!selectedOutline || selectedOutline.slides.length === 0 ? (
+            <EmptyState icon="alert" title={strings.operation.noSlides} compact />
+          ) : (
+            live && (
+              <SlideTiles
+                slides={selectedOutline.slides}
+                liveIndex={selectedIsLive ? (live.cursor.slideIndex ?? -1) : -1}
+                cueIndex={cue.itemId === selected.item.id ? cue.slide : -1}
+                background={live.background}
+                style={live.style}
+                onPick={(i) => goTo(selected.item.id, i)}
+              />
+            )
+          )}
+        </div>
+      </>
+    )
+  })()
 
   return (
-    <section className="operate">
-      <div className="operate__header">
-        <h1 className="screen__title">{strings.operation.title}</h1>
-        <ErrorBanner show={safe.error} />
-        {!online && <p className="hint">{strings.operation.offlineHint}</p>}
-        {attachmentError && (
-          <p className="hint hint--error" role="alert">
-            {strings.operation.attachmentFailed}
-          </p>
-        )}
-      </div>
+    <section className="operate" aria-label={strings.operation.title}>
+      <h1 className="visually-hidden">{strings.operation.title}</h1>
       <div className="operate__body">
-        <div className="operate__col">
-          <h2 className="pane-title">{strings.operation.order}</h2>
-          {items.length === 0 && <p className="hint">{strings.operation.emptyService}</p>}
-          <ul className="list">
-            {items.map((r) => {
-              const att = r.item.data.kind === 'song' && !r.missing ? attachments[r.item.data.songId] : null
-              const classes = ['order-item']
-              if (r.missing) classes.push('order-item--missing')
-              if (r.item.id === cursorId) classes.push('order-item--live')
-              const offline = r.item.data.kind === 'youtube' && !online
-              if (offline) classes.push('order-item--offline')
-              return (
-                <li key={r.item.id} className={classes.join(' ')}>
-                  <button
-                    type="button"
-                    className={r.item.id === selected?.item.id ? 'list__item list__item--active' : 'list__item'}
-                    onClick={() => setSelectedId(r.item.id)}
-                  >
-                    <span className="order-item__kind">{strings.services.kind[r.item.data.kind]}</span>
-                    <span className="order-item__title">{r.missing ? strings.operation.removedItem : r.title}</span>
-                    {offline && <span className="order-item__badge">{strings.operation.offline}</span>}
-                  </button>
-                  {att && (
-                    <button type="button" className="btn" onClick={() => void projectAttachment(r, att)}>
-                      {strings.operation.attachment}
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
+        <aside className="operate__order">
+          <PanelHeader title={strings.operation.order} meta={serviceId ? strings.services.itemCount(items.length) : undefined} />
+          <div className="operate__scroll operate__scroll--order">
+            {serviceId && items.length === 0 && <EmptyState icon="services" title={strings.operation.emptyService} compact />}
+            <RunOfShow
+              items={items}
+              slideCounts={slideCounts}
+              library={library}
+              selectedId={selected?.item.id ?? null}
+              liveId={cursorId}
+              cueId={cue.itemId}
+              online={online}
+              attachments={attachments}
+              onSelect={setSelectedId}
+              onAttachment={(r, att) => void projectAttachment(r, att)}
+            />
+          </div>
+        </aside>
+
+        <div className="operate__center">
+          {(safe.error || attachmentError || (!online && !!serviceId)) && (
+            <div className="operate__alerts">
+              {safe.error && <Notice tone="error">{strings.common.error}</Notice>}
+              {attachmentError && <Notice tone="error">{strings.operation.attachmentFailed}</Notice>}
+              {!online && serviceId && <Notice tone="warn">{strings.operation.offlineHint}</Notice>}
+            </div>
+          )}
+          {center}
         </div>
 
-        <div className="operate__col">
-          <h2 className="pane-title">
-            {selected && !selected.missing ? `${selected.title} · ${strings.operation.slides}` : strings.operation.slides}
-          </h2>
-          {!selected && <p className="hint">{strings.operation.pickItem}</p>}
-          {selected?.missing && <p className="hint">{strings.operation.removedItem}</p>}
-          {selected && !selected.missing && !isMediaItem && selectedOutline && (
-            <SlideGrid
-              slides={selectedOutline.slides}
-              liveIndex={selectedIsLive ? (live?.cursor.slideIndex ?? -1) : -1}
-              onPick={(i) => goTo(selected.item.id, i)}
-            />
-          )}
-          {selected && !selected.missing && isMediaItem && (
+        <aside className="operate__monitors">
+          {live && (
             <>
-              <div>
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  disabled={selectedOffline}
-                  onClick={() => goTo(selected.item.id, 0)}
-                >
-                  {strings.operation.project}
-                </button>
-                {selectedOffline && <p className="hint">{strings.operation.offline}</p>}
-              </div>
-              <MediaControls
-                playing={mediaLive?.playing ?? false}
-                volume={mediaLive?.volume ?? 1}
-                position={liveProgress?.position ?? mediaLive?.position ?? 0}
-                duration={mediaLive ? liveProgress?.duration : undefined}
-                disabled={!mediaLive}
-                onCommand={(cmd) => void run(() => window.sonora.live.media(cmd))}
-              />
+              <NextMonitor live={live} next={cue.next} itemTitle={items.find((r) => r.item.id === cue.itemId)?.title ?? null} />
+              <ProgramMonitor live={live} progress={liveProgress} liveTitle={liveTitle}>
+                {mediaLive && (
+                  <MediaControls
+                    playing={mediaLive.playing}
+                    volume={mediaLive.volume}
+                    position={liveProgress?.position ?? mediaLive.position}
+                    duration={liveProgress?.duration}
+                    onCommand={(cmd) => void run(() => window.sonora.live.media(cmd))}
+                  />
+                )}
+              </ProgramMonitor>
             </>
           )}
-        </div>
-
-        {live && <PreviewPanel live={live} next={next} progress={liveProgress} />}
+        </aside>
       </div>
-      {emergency}
+      <EmergencyBar overlay={live?.overlay ?? 'none'} onOverlay={overlayOf} />
     </section>
   )
 }
