@@ -2,8 +2,9 @@ import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import type { DisplayLike, ProjectionWindowLike } from './projectionWindow'
 import { rendererUrl } from './rendererUrl'
+import { attachCrashRecovery } from './crashRecovery'
 
-/** cria a janela real do telão (tela cheia, sem moldura, sem foco) */
+/** cria a janela real do telão (tela cheia, sem moldura, sem foco); recupera-se sozinha se o renderer cair ou travar */
 export function createProjectionBrowserWindow(
   display: DisplayLike,
   onLoaded: (win: BrowserWindow) => void
@@ -27,7 +28,9 @@ export function createProjectionBrowserWindow(
   win.setFullScreen(true)
   win.setAlwaysOnTop(true, 'screen-saver')
   win.once('ready-to-show', () => win.showInactive())
-  win.webContents.once('did-finish-load', () => onLoaded(win))
+  // a cada carga (inclusive depois de recuperar de uma queda) o telão recebe o estado ao vivo
+  win.webContents.on('did-finish-load', () => onLoaded(win))
+  attachCrashRecovery(win.webContents, (reason) => console.warn('[sonora] telão recarregado:', reason))
   const url = rendererUrl('telao')
   if (url) win.loadURL(url)
   else win.loadFile(join(__dirname, '../renderer/telao/index.html'))

@@ -42,8 +42,10 @@ export function isYoutubeUrl(url: string): boolean {
 export const embedUrl = (id: string): string =>
   `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&rel=0&modestbranding=1&enablejsapi=1`
 /**
- * O YouTube recusa embeds sem HTTP Referer (erro 153). Apps identificam-se com
- * `https://<app id>` (appId do electron-builder.yml).
+ * O YouTube recusa embeds sem HTTP Referer (erro 153). O Sonora se identifica com este
+ * endereço fixo; não precisa existir, só ser https e estável (é também a "origem" que o
+ * YouTube associa às reproduções). Não é derivado do appId (`app.sonora.desktop`, em
+ * electron-builder.config.cjs) — ao mudar um, não é preciso mudar o outro.
  */
 export const YOUTUBE_EMBED_REFERRER = 'https://br.app.sonora/'
 export const watchUrl = (id: string): string => `https://www.youtube.com/watch?v=${id}`

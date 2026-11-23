@@ -55,6 +55,16 @@ test('cadastra música, monta culto e avança o slide ao vivo', async () => {
     await win.keyboard.press('ArrowRight')
     await expect.poll(async () => text(await live())).toContain('Segundo verso')
     await win.screenshot({ path: join(shots, '3-operacao.png') })
+
+    // a janela do operador não sai do próprio renderer (ex.: arquivo solto nela)
+    const before = win.url()
+    await win.evaluate(() => {
+      location.href = 'file:///C:/Windows/win.ini'
+    })
+    await win.waitForTimeout(500)
+    expect(win.url()).toBe(before)
+    // (a navegação cancelada confunde a espera de navegação do Playwright: lê o DOM direto)
+    expect(await win.evaluate(() => !!document.querySelector('.sidebar') && location.href)).toBe(before)
   } finally {
     await app?.close()
     rmSync(userData, { recursive: true, force: true })
