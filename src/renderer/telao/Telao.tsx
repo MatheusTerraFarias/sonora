@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { fitFontSize } from '../../shared/fitText'
+import { fitFontSizeWithFloor } from '../../shared/fitText'
 import type { LiveContent, LiveState, Slide, TextStyle } from '../../shared/types'
 import { Background, mediaUrl } from './Background'
 
@@ -43,7 +43,7 @@ function SlideText({ slide, style }: { slide: Slide; style: TextStyle }): JSX.El
       if (!el || cancelled) return
       const box = { width: window.innerWidth * SAFE, height: window.innerHeight * SAFE }
       el.style.width = `${box.width}px`
-      const size = fitFontSize(
+      const size = fitFontSizeWithFloor(
         (p) => {
           el.style.fontSize = `${p}px`
           return { width: el.scrollWidth, height: el.scrollHeight }
@@ -76,7 +76,7 @@ function SlideText({ slide, style }: { slide: Slide; style: TextStyle }): JSX.El
           position: 'absolute',
           inset: 0,
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'safe center',
           justifyContent: 'center'
         }}
       >

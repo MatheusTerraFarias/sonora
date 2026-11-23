@@ -25,3 +25,24 @@ export function fitFontSize(
   }
   return lo
 }
+
+/** Piso absoluto (px) usado só em último recurso, abaixo de minPx. */
+export const ABSOLUTE_MIN_PX = 12
+
+/**
+ * Como fitFontSize, mas se nem minPx cabe, continua abaixo dele (busca binária)
+ * até `floorPx`; se nem o piso cabe, retorna o piso.
+ */
+export function fitFontSizeWithFloor(
+  measure: (px: number) => Size,
+  box: Size,
+  minPx: number,
+  maxPx: number,
+  floorPx: number = ABSOLUTE_MIN_PX
+): number {
+  const size = fitFontSize(measure, box, minPx, maxPx)
+  const m = measure(size)
+  if (m.width <= box.width && m.height <= box.height) return size
+  const floor = Math.min(Math.floor(floorPx), size)
+  return fitFontSize(measure, box, floor, size - 1 < floor ? floor : size - 1)
+}
