@@ -467,14 +467,18 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
   line-height: 1.25;
   font-weight: 600;
 }
+/* rodapé (referência, título do aviso): desenhado em px reais para ficar legível na miniatura */
 .stage__footer {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2.5%;
+  left: 5%;
+  right: 5%;
   text-align: center;
-  font-size: 32px;
-  opacity: 0.8;
+  font-weight: 600;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 .stage__overlay {
   position: absolute;

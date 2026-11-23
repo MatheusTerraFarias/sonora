@@ -10,7 +10,7 @@ interface Props {
   children: React.ReactNode
 }
 
-/** Diálogo modal nativo (<dialog>): foco preso, Esc fecha, fundo escurecido. */
+/** Diálogo modal nativo (<dialog>): foco preso; fecha só por Cancelar, X ou Esc (clique fora não fecha, para não perder o que foi digitado). */
 export function Dialog({ open, title, description, onClose, children }: Props): JSX.Element | null {
   const ref = useRef<HTMLDialogElement>(null)
 
@@ -30,10 +30,6 @@ export function Dialog({ open, title, description, onClose, children }: Props): 
       onCancel={(e) => {
         e.preventDefault()
         onClose()
-      }}
-      onMouseDown={(e) => {
-        // clique no fundo (fora da caixa) fecha
-        if (e.target === e.currentTarget) onClose()
       }}
     >
       <div className="dialog__box">

@@ -202,7 +202,11 @@ test('capturas de todas as telas do operador com dados de exemplo', async () => 
     await win.getByRole('button', { name: 'Novo culto' }).click()
     await win.getByLabel('Nome').fill('Culto de Natal')
     await shot(win, '9-novo-culto.png')
+    // clique fora não fecha o diálogo (não perde o que foi digitado)
+    await win.mouse.click(1240, 760)
+    await expect(win.getByLabel('Nome')).toHaveValue('Culto de Natal')
     await win.keyboard.press('Escape')
+    await expect(win.getByRole('dialog')).toHaveCount(0)
 
     // ---------- Operação ----------
     await nav('Operação').click()

@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fitFontSizeWithFloor } from '../../shared/fitText'
+import { LINE_HEIGHT, slideLayout } from '../../shared/slideLayout'
 import type { LiveContent, LiveState, Slide, TextStyle } from '../../shared/types'
 import { Background, mediaUrl } from './Background'
 import { YouTubePlayer } from './YouTubePlayer'
 
 const FADE_MS = 300
-const SAFE = 0.9
-const LINE_HEIGHT = 1.25
 /** intervalo mínimo entre relatos de progresso ao operador (~4 Hz) */
 const PROGRESS_MS = 250
 
@@ -44,7 +43,8 @@ function SlideText({ slide, style }: { slide: Slide; style: TextStyle }): JSX.El
     const fit = (): void => {
       const el = measureRef.current
       if (!el || cancelled) return
-      const box = { width: window.innerWidth * SAFE, height: window.innerHeight * SAFE }
+      const layout = slideLayout(window.innerWidth, window.innerHeight, !!slide.title)
+      const box = { width: layout.textWidth, height: layout.textHeight }
       el.style.width = `${box.width}px`
       const size = fitFontSizeWithFloor(
         (p) => {
@@ -62,9 +62,11 @@ function SlideText({ slide, style }: { slide: Slide; style: TextStyle }): JSX.El
     return () => {
       cancelled = true
     }
-  }, [slide.text, style.fontFamily, style.minFontPx, style.maxFontPx, tick])
+  }, [slide.text, slide.title, style.fontFamily, style.minFontPx, style.maxFontPx, tick])
 
   const base = textBase(style)
+  // com rodapé, a área do texto termina acima da faixa dele (mesma geometria das miniaturas)
+  const layout = slideLayout(window.innerWidth, window.innerHeight, !!slide.title)
   return (
     <>
       <div
@@ -77,7 +79,10 @@ function SlideText({ slide, style }: { slide: Slide; style: TextStyle }): JSX.El
       <div
         style={{
           position: 'absolute',
-          inset: 0,
+          left: 0,
+          right: 0,
+          top: layout.textTop,
+          bottom: layout.textBottom,
           display: 'flex',
           alignItems: 'safe center',
           justifyContent: 'center'
@@ -86,7 +91,7 @@ function SlideText({ slide, style }: { slide: Slide; style: TextStyle }): JSX.El
         <div
           style={{
             ...base,
-            width: `${SAFE * 100}%`,
+            width: layout.textWidth,
             fontSize: px,
             color: style.color,
             textShadow: style.shadow ? '0 2px 8px rgba(0,0,0,0.8)' : 'none',
@@ -102,10 +107,11 @@ function SlideText({ slide, style }: { slide: Slide; style: TextStyle }): JSX.El
             position: 'absolute',
             left: 0,
             right: 0,
-            bottom: '2.5%',
+            bottom: layout.footerBottom,
             textAlign: 'center',
             fontFamily: base.fontFamily,
-            fontSize: Math.max(16, Math.round(window.innerHeight * 0.03)),
+            fontSize: layout.footerPx,
+            lineHeight: LINE_HEIGHT,
             color: style.color,
             opacity: 0.8,
             textShadow: style.shadow ? '0 1px 4px rgba(0,0,0,0.8)' : 'none'
