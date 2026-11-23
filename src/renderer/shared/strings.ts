@@ -166,6 +166,7 @@ export const strings = {
     play: 'Reproduzir',
     pause: 'Pausar',
     volume: 'Volume',
-    position: 'Posição'
+    position: 'Posição',
+    unknownTime: '--:--'
   }
 } as const

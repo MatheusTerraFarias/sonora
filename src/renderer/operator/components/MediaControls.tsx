@@ -1,7 +1,4 @@
-import { useEffect, useState } from 'react'
-import type { MediaItem } from '../../../shared/types'
 import { strings } from '../../shared/strings'
-import { mediaUrl } from './MediaThumb'
 import './Operate.css'
 
 export const formatTime = (sec: number): string => {
@@ -13,35 +10,16 @@ interface Props {
   playing: boolean
   volume: number
   position: number
-  /** mídia local: a duração vem dos metadados do arquivo; YouTube: desconhecida */
-  media?: MediaItem
+  /** duração em segundos; desconhecida (undefined) até o telão informar o progresso (Task 13) */
+  duration?: number
   /** só controla o que está no ar */
   disabled?: boolean
   onCommand: (cmd: { play?: boolean; volume?: number; position?: number }) => void
 }
 
-/** Duração lida só dos metadados (sem tocar nem decodificar o vídeo). */
-function useDuration(media?: MediaItem): number {
-  const [duration, setDuration] = useState(0)
-  useEffect(() => {
-    setDuration(0)
-    if (!media || media.kind === 'image') return
-    const el = document.createElement(media.kind === 'video' ? 'video' : 'audio')
-    el.preload = 'metadata'
-    el.onloadedmetadata = () => setDuration(Number.isFinite(el.duration) ? el.duration : 0)
-    el.src = mediaUrl(media.id)
-    return () => {
-      el.onloadedmetadata = null
-      el.removeAttribute('src')
-      el.load()
-    }
-  }, [media])
-  return duration
-}
-
 /** Play/pausa, volume e barra de posição. */
-export function MediaControls({ playing, volume, position, media, disabled, onCommand }: Props): JSX.Element {
-  const duration = useDuration(media)
+export function MediaControls({ playing, volume, position, duration, disabled, onCommand }: Props): JSX.Element {
+  const known = !!duration && duration > 0
   return (
     <div className="media-controls" role="group" aria-label={strings.operation.mediaControlsTitle}>
       <button type="button" className="btn btn--primary" disabled={disabled} onClick={() => onCommand({ play: !playing })}>
@@ -52,15 +30,14 @@ export function MediaControls({ playing, volume, position, media, disabled, onCo
         <input
           type="range"
           min={0}
-          max={duration || 1}
+          max={known ? duration : 1}
           step={0.1}
-          value={Math.min(position, duration || 1)}
-          disabled={disabled || !duration}
+          value={known ? Math.min(position, duration) : 0}
+          disabled={disabled || !known}
           onChange={(e) => onCommand({ position: Number(e.target.value) })}
         />
         <span className="media-controls__time">
-          {formatTime(position)}
-          {duration ? ` / ${formatTime(duration)}` : ''}
+          {known ? `${formatTime(position)} / ${formatTime(duration)}` : strings.operation.unknownTime}
         </span>
       </label>
       <label className="media-controls__slider">

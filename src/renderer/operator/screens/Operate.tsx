@@ -119,18 +119,18 @@ export function Operate(): JSX.Element {
             thumbnail: `https://i.ytimg.com/vi/${att.videoId}/hqdefault.jpg`
           } as const)
         : ({ kind: 'media', mediaId: att.mediaId } as const)
-    const added = await run(async () => {
-      const it = await window.sonora.services.addItem(serviceId, data, r.item.position + 1)
-      await window.sonora.live.loadService(serviceId)
-      await window.sonora.live.goTo(it.id, 0)
-      return it
-    })
+    const added = await run(() => window.sonora.services.addItem(serviceId, data, r.item.position + 1))
     if (!added.ok) {
       setAttachmentError(true)
       return
     }
+    // o item já está salvo: a lista é sempre recarregada, mesmo que o resto falhe
+    const itemId = added.value.id
+    const reloaded = await run(() => window.sonora.live.loadService(serviceId))
     await refresh(serviceId)
-    setSelectedId(added.value.id)
+    setSelectedId(itemId)
+    if (!reloaded.ok) return
+    await run(() => window.sonora.live.goTo(itemId, 0))
   }
 
   const projection = useMemo(() => {
@@ -243,7 +243,6 @@ export function Operate(): JSX.Element {
                 playing={mediaLive?.playing ?? false}
                 volume={mediaLive?.volume ?? 1}
                 position={mediaLive?.position ?? 0}
-                media={selData?.kind === 'media' ? library.find((m) => m.id === selData.mediaId) : undefined}
                 disabled={!mediaLive}
                 onCommand={(cmd) => void run(() => window.sonora.live.media(cmd))}
               />

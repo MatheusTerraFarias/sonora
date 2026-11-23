@@ -26,12 +26,19 @@ export function AddToServiceButton({ data, label = strings.addToService.button, 
     setState('busy')
     try {
       await window.sonora.services.addItem(serviceId, data)
-      await window.sonora.live.loadService(serviceId)
-      setState('done')
-      onAdded?.()
     } catch {
       setState('error')
+      return
     }
+    // já salvo: uma falha ao recarregar o ao vivo não desfaz nem repete a adição
+    let reloadFailed = false
+    try {
+      await window.sonora.live.loadService(serviceId)
+    } catch {
+      reloadFailed = true
+    }
+    setState(reloadFailed ? 'error' : 'done')
+    onAdded?.()
   }
 
   return (

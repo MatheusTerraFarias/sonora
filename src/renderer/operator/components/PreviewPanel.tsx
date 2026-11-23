@@ -1,7 +1,5 @@
 import type { LiveState, MediaItem, Slide } from '../../../shared/types'
 import { strings } from '../../shared/strings'
-import { formatTime } from './MediaControls'
-import { MediaThumb } from './MediaThumb'
 import { SlideThumb } from './SlideThumb'
 import './Operate.css'
 
@@ -14,6 +12,8 @@ interface Props {
   live: LiveState
   next: NextPreview
 }
+
+const KIND_LABEL = { image: strings.media.kindImage, video: strings.media.kindVideo, audio: strings.media.kindAudio } as const
 
 const OVERLAY_LABEL = {
   clear: strings.operation.overlayClear,
@@ -32,7 +32,7 @@ export function PreviewPanel({ live, next }: Props): JSX.Element {
           {next.kind === 'slide' && <SlideThumb label={strings.operation.previewNext} text={next.slide.text} />}
           {next.kind === 'media' && (
             <>
-              {next.media && <MediaThumb media={next.media} />}
+              <div className="preview-box__yt">{next.media ? KIND_LABEL[next.media.kind] : strings.operation.youtubeItem}</div>
               <span className="preview-box__title">{next.title}</span>
             </>
           )}
@@ -46,14 +46,16 @@ export function PreviewPanel({ live, next }: Props): JSX.Element {
           {c.type === 'slide' && <SlideThumb label={c.slide.label} text={c.slide.text} />}
           {c.type === 'media' && (
             <>
-              <MediaThumb media={c.media} />
-              <span className="preview-box__title">{formatTime(c.position)}</span>
+              <div className="preview-box__yt">{KIND_LABEL[c.media.kind]}</div>
+              <span className="preview-box__title">
+                {c.media.originalName} · {strings.operation.unknownTime}
+              </span>
             </>
           )}
           {c.type === 'youtube' && (
             <>
               <div className="preview-box__yt">{strings.operation.youtubeItem}</div>
-              <span className="preview-box__title">{formatTime(c.position)}</span>
+              <span className="preview-box__title">{strings.operation.unknownTime}</span>
             </>
           )}
           {c.type === 'none' && live.overlay === 'none' && <p className="hint">{strings.operation.liveNothing}</p>}
