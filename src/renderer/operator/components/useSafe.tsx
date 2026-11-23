@@ -1,9 +1,8 @@
 import { useCallback, useState } from 'react'
-import { strings } from '../../shared/strings'
 
 export type SafeResult<T> = { ok: true; value: T } | { ok: false; message: string }
 
-/** Executa chamadas à API capturando falhas; `error` alimenta o ErrorBanner. */
+/** Executa chamadas à API capturando falhas; `error` alimenta um <Notice tone="error">. */
 export function useSafe(): {
   error: boolean
   clearError: () => void
@@ -22,12 +21,4 @@ export function useSafe(): {
   }, [])
   const clearError = useCallback(() => setError(false), [])
   return { error, clearError, run }
-}
-
-export function ErrorBanner({ show }: { show: boolean }): JSX.Element | null {
-  return show ? (
-    <p className="hint hint--error" role="alert">
-      {strings.common.error}
-    </p>
-  ) : null
 }

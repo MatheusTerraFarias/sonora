@@ -1,0 +1,208 @@
+/* Layout comum das telas de biblioteca e cadastro: lista à esquerda, detalhe à direita. */
+.split {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+.split__list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--navy);
+  border-right: 1px solid var(--line);
+}
+.split__tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+}
+.split__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--s-2) var(--s-4);
+}
+.split__detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.split__detail > .panel-header {
+  padding-left: var(--s-6);
+  padding-right: var(--s-6);
+  min-height: 72px;
+}
+.detail__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.detail__body {
+  padding: var(--s-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+  max-width: 1080px;
+}
+.detail__empty {
+  padding: var(--s-6);
+}
+
+.section-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: var(--s-3);
+}
+
+/* lista de linhas */
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row {
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease);
+}
+.row:hover {
+  background: rgba(22, 38, 109, 0.6);
+}
+.row--active,
+.row--active:hover {
+  background: var(--royal);
+}
+.row--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--blue);
+}
+.row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.row__title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row__meta {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.row__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-control);
+  background: var(--cabine);
+  color: var(--text-2);
+}
+.row--active .row__icon {
+  color: var(--text);
+}
+.group-label {
+  padding: var(--s-4) var(--s-3) var(--s-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* grade de miniaturas de prévia */
+.preview-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--s-4);
+}
+.preview-grid__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.preview-grid__item .stage {
+  border-radius: var(--r-monitor);
+  outline: 1px solid var(--line);
+}
+.preview-grid__caption {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-2);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.preview-grid__caption strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s-4);
+}
+.form-grid__wide {
+  grid-column: 1 / -1;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.inline-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* tela de área única (sem lista): cabeçalho + conteúdo rolável */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.workspace > .panel-header {
+  padding-left: var(--s-6);
+  padding-right: var(--s-6);
+  min-height: 72px;
+  background: var(--navy);
+}

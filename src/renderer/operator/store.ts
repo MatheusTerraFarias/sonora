@@ -11,6 +11,9 @@ interface OperatorState {
   /** conexão combinada do main: navigator.onLine (enviado via live.setOnline) + teste real ao YouTube */
   onlineStatus: boolean
   setOnlineStatus: (online: boolean) => void
+  /** muda quando a lista de cultos muda (a barra superior relê nome e data) */
+  servicesVersion: number
+  bumpServices: () => void
 }
 
 export const useOperatorStore = create<OperatorState>((set) => ({
@@ -19,7 +22,9 @@ export const useOperatorStore = create<OperatorState>((set) => ({
   setSection: (section) => set({ section }),
   setCurrentServiceId: (currentServiceId) => set({ currentServiceId }),
   onlineStatus: typeof navigator === 'undefined' ? true : navigator.onLine,
-  setOnlineStatus: (onlineStatus) => set({ onlineStatus })
+  setOnlineStatus: (onlineStatus) => set({ onlineStatus }),
+  servicesVersion: 0,
+  bumpServices: () => set((s) => ({ servicesVersion: s.servicesVersion + 1 }))
 }))
 
 /**

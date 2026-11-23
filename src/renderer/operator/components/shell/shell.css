@@ -1,0 +1,221 @@
+/* Moldura do app: trilho de navegação + barra superior + tela. */
+.shell {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
+  grid-template-areas:
+    'rail top'
+    'rail main';
+  height: 100%;
+}
+.shell__main {
+  grid-area: main;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.shell__main > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- trilho ---------- */
+.rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-2);
+  background: var(--navy);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.rail__symbol {
+  width: 36px;
+  height: auto;
+  margin: 2px 0 var(--s-3);
+}
+.rail__group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+.rail__group--end {
+  margin-top: auto;
+}
+.rail__divider {
+  width: 32px;
+  height: 1px;
+  background: var(--line);
+  margin: var(--s-1) 0;
+}
+.rail__item {
+  position: relative;
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+.rail__item:hover {
+  background: var(--royal);
+  color: var(--text);
+}
+.rail__item--active {
+  background: var(--royal);
+  color: var(--text);
+}
+.rail__item--active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--blue);
+}
+.rail__item--active .icon {
+  color: #8fa8ff;
+}
+.rail__label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- barra superior ---------- */
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: 0 var(--s-4) 0 var(--s-5);
+  background: var(--navy);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.topbar__service {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-width: 0;
+}
+.topbar__service-name {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar__service-date {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.topbar__service-none {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.topbar__service--none {
+  align-items: center;
+}
+.topbar__status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+}
+.topbar__offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ambar);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.topbar__onair {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-control);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+}
+.topbar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--linha);
+  flex: none;
+}
+.topbar__onair--live .topbar__dot {
+  background: var(--mint);
+}
+.topbar__onair-label {
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+.topbar__onair--live .topbar__onair-label {
+  color: var(--mint);
+}
+.topbar__onair-text {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar__onair--live .topbar__onair-text {
+  color: var(--text);
+}
+.topbar__telao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-control);
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 600;
+}
+.topbar__telao .icon {
+  color: var(--mint);
+}
+.topbar__telao--off {
+  background: var(--alerta);
+  color: var(--cabine);
+}
+.topbar__telao--off .icon {
+  color: var(--cabine);
+}
+
+@media (max-width: 1100px) {
+  .topbar__weekday,
+  .topbar__onair-text {
+    display: none;
+  }
+}

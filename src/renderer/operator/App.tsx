@@ -1,5 +1,11 @@
 import { useEffect } from 'react'
-import { Sidebar } from './components/Sidebar'
+// estilos base antes das telas: o CSS de cada tela vem depois e pode refinar o comum
+import './base.css'
+import './components/ui/ui.css'
+import './components/shell/shell.css'
+import './screens/library.css'
+import { NavRail } from './components/shell/NavRail'
+import { TopBar } from './components/shell/TopBar'
 import { Bible } from './screens/Bible'
 import { Settings } from './screens/Settings'
 import { Media } from './screens/Media'
@@ -9,7 +15,6 @@ import { Services } from './screens/Services'
 import { Songs } from './screens/Songs'
 import { YouTube } from './screens/YouTube'
 import { useOperatorStore, watchOnlineStatus, type Section } from './store'
-import './operator.css'
 
 function Screen({ section }: { section: Section }): JSX.Element {
   switch (section) {
@@ -37,7 +42,8 @@ export function App(): JSX.Element {
   useEffect(() => watchOnlineStatus(), [])
   return (
     <div className="shell">
-      <Sidebar />
+      <NavRail />
+      <TopBar />
       <main className="shell__main">
         <Screen section={section} />
       </main>

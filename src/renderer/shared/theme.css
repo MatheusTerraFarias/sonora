@@ -5,17 +5,63 @@
   font-display: swap;
 }
 
+/*
+ * Tokens da interface (ver docs/superpowers/specs/2026-11-23-sonora-ui-redesign.md).
+ * Cor tem significado: Mint = no ar, Âmbar = próximo/aviso, Alerta = problema, Blue = agir.
+ */
 :root {
+  /* marca + funcionais */
+  --cabine: #070c2e;
   --navy: #09124f;
+  --linha: #1c2763;
   --royal: #16266d;
   --blue: #4169e1;
-  --cloud: #f5f7fc;
   --mint: #19b99a;
-  --bg: var(--navy);
-  --surface: var(--royal);
+  --ambar: #f2b33d;
+  --alerta: #e5566b;
+  --cloud: #f5f7fc;
+  --nevoa: #8c96c8;
+
+  /* papéis */
+  --bg: var(--cabine);
+  --panel: var(--navy);
+  --line: var(--linha);
+  --hover: var(--royal);
   --text: var(--cloud);
+  --text-2: var(--nevoa);
   --accent: var(--blue);
   --live: var(--mint);
+  --cue: var(--ambar);
+  --danger: var(--alerta);
+  /* compatibilidade com o telão */
+  --surface: var(--royal);
+
+  /* tipografia: 12 / 13 / 15 / 18 / 24 / 32 */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+  --fs-2xl: 32px;
+
+  /* raios com hierarquia */
+  --r-monitor: 6px;
+  --r-control: 8px;
+  --r-pill: 999px;
+
+  /* ritmo de 4px */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t-fast: 120ms;
+  --t-swap: 180ms;
+
   font-family: 'Sora', system-ui, sans-serif;
   color-scheme: dark;
 }
