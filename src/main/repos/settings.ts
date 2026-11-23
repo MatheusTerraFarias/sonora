@@ -14,7 +14,12 @@ export function createSettingsRepo(db: Db) {
   function get(): Settings {
     const merged = structuredClone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>
     for (const row of readAll.all() as { key: string; value: string }[]) {
-      if (KEYS.has(row.key)) merged[row.key] = JSON.parse(row.value)
+      if (!KEYS.has(row.key)) continue
+      try {
+        merged[row.key] = JSON.parse(row.value)
+      } catch {
+        // valor corrompido: mantém o padrão para não impedir a abertura do app
+      }
     }
     return merged as unknown as Settings
   }

@@ -54,6 +54,15 @@ test('objetos aninhados são substituídos inteiros, sem merge profundo', () => 
   expect(next.style).toEqual({ ...DEFAULT_SETTINGS.style, color: '#FF0000', align: 'left' })
 })
 
+test('linha com JSON corrompido volta ao padrão sem quebrar get; as demais valem', () => {
+  db.prepare('INSERT INTO settings(key, value) VALUES (?, ?)').run('churchName', '{nao-e-json')
+  db.prepare('INSERT INTO settings(key, value) VALUES (?, ?)').run('adblockEnabled', 'true')
+  const s = repo.get()
+  expect(s.churchName).toBe(DEFAULT_SETTINGS.churchName)
+  expect(s.adblockEnabled).toBe(true)
+  expect(s.style).toEqual(DEFAULT_SETTINGS.style)
+})
+
 test('unsubscribe de onChange interrompe as notificações', () => {
   const cb = vi.fn()
   const off = repo.onChange(cb)
