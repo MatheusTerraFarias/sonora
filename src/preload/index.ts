@@ -4,6 +4,7 @@ import type { SongInput } from '../main/repos/songs'
 import type { TranslationInfo } from '../main/bible/bibleStore'
 import type { YoutubeFavorite } from '../main/repos/favorites'
 import type { Passage } from '../shared/slides'
+import type { DisplayInfo } from '../shared/displays'
 
 const call =
   (channel: string) =>
@@ -89,6 +90,9 @@ export const api = {
     loadService: call('live:loadService') as (serviceId: ID) => Promise<void>,
     setOnline: call('live:setOnline') as (online: boolean) => Promise<void>,
     onState: (cb: (s: LiveState) => void): (() => void) => on('live:state', cb)
+  },
+  displays: {
+    list: call('displays:list') as () => Promise<DisplayInfo[]>
   },
   on
 }

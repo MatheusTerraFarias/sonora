@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell } from 'electron'
+import { app, BrowserWindow, dialog, screen } from 'electron'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { openDatabase, type Db } from './db/database'
@@ -12,6 +12,10 @@ import { createFavoritesRepo, type YoutubeFavorite } from './repos/favorites'
 import { createSettingsRepo } from './repos/settings'
 import { LiveController } from './live/liveController'
 import { strings } from './strings'
+import { createOperatorWindow } from './windows/operatorWindow'
+import { ProjectionWindowManager } from './windows/projectionWindow'
+import { createProjectionBrowserWindow } from './windows/projectionWindowFactory'
+import type { DisplayInfo } from '../shared/displays'
 import type { LiveState, MediaKind, Overlay, ServiceItemData, Settings } from '../shared/types'
 
 registerMediaScheme()
@@ -21,38 +25,6 @@ let db: Db | null = null
 /** envia a todas as janelas vivas */
 function broadcast(channel: string, payload: unknown): void {
   for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload)
-}
-
-function rendererUrl(page: 'operator' | 'telao'): string | null {
-  const base = process.env['ELECTRON_RENDERER_URL']
-  return base ? `${base}/${page}/index.html` : null
-}
-
-function createOperatorWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 960,
-    minHeight: 600,
-    show: false,
-    backgroundColor: '#09124F',
-    title: 'Sonora',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  })
-  win.once('ready-to-show', () => win.show())
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
-  })
-  const url = rendererUrl('operator')
-  if (url) win.loadURL(url)
-  else win.loadFile(join(__dirname, '../renderer/operator/index.html'))
-  return win
 }
 
 app.whenReady().then(() => {
@@ -147,10 +119,42 @@ app.whenReady().then(() => {
   handle('live:media', (cmd: { play?: boolean; volume?: number; position?: number }) => live.media(cmd))
   handle('live:loadService', (serviceId: string) => live.loadService(serviceId))
   handle('live:setOnline', (online: boolean) => live.setOnline(online))
-  createOperatorWindow()
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createOperatorWindow()
+  const operatorWin = createOperatorWindow()
+  operatorWin.on('closed', () => app.quit())
+  const primaryId = (): number => screen.getPrimaryDisplay().id
+  const operatorDisplayId = (): number =>
+    operatorWin.isDestroyed() ? primaryId() : screen.getDisplayMatching(operatorWin.getBounds()).id
+  const projection = new ProjectionWindowManager({
+    getDisplays: () => screen.getAllDisplays().map((d) => ({ id: d.id, primary: d.id === primaryId(), bounds: d.bounds })),
+    getOperatorDisplayId: operatorDisplayId,
+    getSavedId: () => settings.get().projectionDisplayId,
+    createWindow: (display) =>
+      createProjectionBrowserWindow(display, (win) => {
+        if (!win.isDestroyed()) win.webContents.send('live:state', live.get())
+      })
   })
+  handle('displays:list', (): DisplayInfo[] => {
+    const opId = operatorDisplayId()
+    return screen.getAllDisplays().map((d, i) => ({
+      id: d.id,
+      label: strings.displays.monitor(i + 1, d.size.width, d.size.height),
+      primary: d.id === primaryId(),
+      isOperator: d.id === opId
+    }))
+  })
+  let lastSaved = settings.get().projectionDisplayId
+  settings.onChange((s) => {
+    if (s.projectionDisplayId !== lastSaved) {
+      lastSaved = s.projectionDisplayId
+      projection.sync()
+    }
+  })
+  screen.on('display-added', () => projection.sync())
+  screen.on('display-removed', () => projection.sync())
+  screen.on('display-metrics-changed', () => projection.sync())
+  operatorWin.on('moved', () => projection.sync())
+  projection.sync()
+  app.on('before-quit', () => projection.destroy())
 })
 
 app.on('window-all-closed', () => {

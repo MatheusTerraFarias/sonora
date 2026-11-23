@@ -8,6 +8,9 @@ export const strings = {
     importTitle: 'Importar mídias',
     filterName: 'Imagens, vídeos e áudios'
   },
+  displays: {
+    monitor: (n: number, w: number, h: number) => `Monitor ${n} (${w}×${h})`
+  },
   services: {
     removedItem: 'Item removido'
   }
