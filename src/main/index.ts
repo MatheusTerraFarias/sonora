@@ -5,6 +5,12 @@ import { openDatabase, type Db } from './db/database'
 import { handle } from './ipc'
 import { createSongsRepo, type SongInput } from './repos/songs'
 import { createBibleStore } from './bible/bibleStore'
+import { createMediaRepo, MEDIA_EXTENSIONS } from './repos/media'
+import { handleMediaProtocol, registerMediaScheme } from './media/protocol'
+import { strings } from './strings'
+import type { MediaKind } from '../shared/types'
+
+registerMediaScheme()
 
 let db: Db | null = null
 
@@ -59,8 +65,8 @@ app.whenReady().then(() => {
     let path = file
     if (!path) {
       const r = await dialog.showOpenDialog({
-        title: 'Importar tradução da Bíblia',
-        filters: [{ name: 'Bíblia (JSON)', extensions: ['json'] }],
+        title: strings.bible.importTitle,
+        filters: [{ name: strings.bible.filterName, extensions: ['json'] }],
         properties: ['openFile']
       })
       if (r.canceled || !r.filePaths[0]) return null
@@ -72,6 +78,20 @@ app.whenReady().then(() => {
   handle('bible:search', (translationId: string, words: string, limit?: number) =>
     bible.search(translationId, words, limit)
   )
+  const media = createMediaRepo(db, join(dir, 'media'))
+  handleMediaProtocol(media)
+  handle('media:list', (kind?: MediaKind) => media.list(kind))
+  handle('media:importFile', (path: string) => media.importFile(path))
+  handle('media:remove', (id: string) => media.remove(id))
+  handle('media:pickAndImport', async () => {
+    const r = await dialog.showOpenDialog({
+      title: strings.media.importTitle,
+      filters: [{ name: strings.media.filterName, extensions: MEDIA_EXTENSIONS }],
+      properties: ['openFile', 'multiSelections']
+    })
+    if (r.canceled) return []
+    return r.filePaths.map((p) => media.importFile(p))
+  })
   createOperatorWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createOperatorWindow()

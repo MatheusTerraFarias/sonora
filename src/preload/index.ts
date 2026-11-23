@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ID, Song } from '../shared/types'
+import type { ID, MediaItem, MediaKind, Song } from '../shared/types'
 import type { SongInput } from '../main/repos/songs'
 import type { TranslationInfo } from '../main/bible/bibleStore'
 import type { Passage } from '../shared/slides'
@@ -35,6 +35,13 @@ export const api = {
       words: string,
       limit?: number
     ) => Promise<{ ref: string; text: string }[]>
+  },
+  media: {
+    list: call('media:list') as (kind?: MediaKind) => Promise<MediaItem[]>,
+    importFile: call('media:importFile') as (path: string) => Promise<MediaItem>,
+    remove: call('media:remove') as (id: ID) => Promise<void>,
+    /** abre o seletor (várias seleções); [] se cancelado */
+    pickAndImport: call('media:pickAndImport') as () => Promise<MediaItem[]>
   },
   /** Assina um evento enviado pelo main. Retorna a função de cancelamento. */
   on(channel: string, cb: (...args: any[]) => void): () => void {
