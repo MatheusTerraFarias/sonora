@@ -1,0 +1,29 @@
+.songs__empty {
+  padding: 0 var(--s-2);
+}
+.song-editor__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 1fr);
+  gap: var(--s-8);
+  align-items: start;
+}
+.song-editor__meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: var(--s-4);
+}
+.song-editor__lyrics {
+  min-height: 300px;
+}
+.song-editor__preview {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--s-3);
+}
+.attachment {
+  display: flex;
+  gap: var(--s-2);
+}
+.attachment__mode {
+  width: 200px;
+  flex: none;
+}

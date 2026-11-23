@@ -1,0 +1,10 @@
+.notices__grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 460px) minmax(320px, 1fr);
+  gap: var(--s-8);
+  align-items: start;
+}
+.notices__preview .stage {
+  border-radius: var(--r-monitor);
+  outline: 1px solid var(--line);
+}

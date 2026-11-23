@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { MediaItem, SongAttachment } from '../../../shared/types'
 import { parseVideoId } from '../../../shared/youtube'
 import { strings } from '../../shared/strings'
-import { ErrorBanner, useSafe } from './useSafe'
+import { Notice } from './ui/EmptyState'
+import { useSafe } from './useSafe'
 
 type Mode = 'none' | 'youtube' | 'media'
 
@@ -44,25 +45,26 @@ export function AttachmentField({ value, songTitle, onChange }: Props): JSX.Elem
   }
 
   return (
-    <div className="form__row">
-      <span>{strings.songs.attachment}</span>
+    <div className="field-row">
+      <span className="field-row__label">{strings.songs.attachment}</span>
       <div className="attachment">
-        <select className="field" aria-label={strings.songs.attachment} value={mode} onChange={(e) => changeMode(e.target.value as Mode)}>
+        <select className="input attachment__mode" aria-label={strings.songs.attachment} value={mode} onChange={(e) => changeMode(e.target.value as Mode)}>
           <option value="none">{strings.songs.attachmentNone}</option>
           <option value="youtube">{strings.songs.attachmentYoutube}</option>
           <option value="media">{strings.songs.attachmentMedia}</option>
         </select>
         {mode === 'youtube' && (
           <input
-            className="field"
+            className="input"
             value={link}
+            aria-label={strings.songs.attachmentYoutube}
             placeholder={strings.songs.attachmentYoutubePlaceholder}
             onChange={(e) => setLink(e.target.value)}
           />
         )}
         {mode === 'media' && (
           <select
-            className="field"
+            className="input"
             aria-label={strings.songs.attachmentMedia}
             value={value?.kind === 'media' ? value.mediaId : ''}
             onChange={(e) => onChange(e.target.value ? { kind: 'media', mediaId: e.target.value } : null, true)}
@@ -76,8 +78,8 @@ export function AttachmentField({ value, songTitle, onChange }: Props): JSX.Elem
           </select>
         )}
       </div>
-      <ErrorBanner show={safe.error} />
-      {invalid && <span className="hint hint--error">{strings.songs.attachmentInvalid}</span>}
+      {safe.error && <Notice tone="error">{strings.common.error}</Notice>}
+      {invalid && <span className="field-row__error">{strings.songs.attachmentInvalid}</span>}
     </div>
   )
 }

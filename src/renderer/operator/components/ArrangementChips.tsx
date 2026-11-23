@@ -5,6 +5,8 @@ import { CSS } from '@dnd-kit/utilities'
 import type { ID, SongPart } from '../../../shared/types'
 import { appendToArrangement, moveInArrangement, removeFromArrangement } from '../../../shared/arrangement'
 import { strings } from '../../shared/strings'
+import { Button } from './ui/Button'
+import { Icon } from './ui/Icon'
 import './ArrangementChips.css'
 
 interface Chip {
@@ -37,7 +39,7 @@ function Sortable({ chip, label, onRemove }: { chip: Chip; label: string; onRemo
         onPointerDown={(e) => e.stopPropagation()}
         onClick={onRemove}
       >
-        ×
+        <Icon name="close" size={12} />
       </button>
     </li>
   )
@@ -109,16 +111,16 @@ export function ArrangementChips({ parts, arrangement, onChange }: Props): JSX.E
       )}
       {parts.length > 0 && (
         <div className="arrangement__add">
-          <select className="field" aria-label={strings.songs.addPart} value={addId || parts[0].id} onChange={(e) => setAddId(e.target.value)}>
+          <select className="input" aria-label={strings.songs.addPart} value={addId || parts[0].id} onChange={(e) => setAddId(e.target.value)}>
             {parts.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
               </option>
             ))}
           </select>
-          <button type="button" className="btn" onClick={add}>
+          <Button size="sm" icon="plus" onClick={add}>
             {strings.songs.addPartButton}
-          </button>
+          </Button>
         </div>
       )}
     </div>
