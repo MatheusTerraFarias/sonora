@@ -15,7 +15,7 @@ import { strings } from './strings'
 import { createOperatorWindow } from './windows/operatorWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
 import { createProjectionBrowserWindow } from './windows/projectionWindowFactory'
-import { exportBackup, restoreBackup } from './backup'
+import { cleanupRestoreLeftovers, exportBackup, restoreBackup } from './backup'
 import { identifyDisplays } from './windows/identifyWindows'
 import { fetchOembed, hardenWebviews } from './youtube/session'
 import type { DisplayInfo } from '../shared/displays'
@@ -47,6 +47,9 @@ app.whenReady().then(() => {
   const dir = app.getPath('userData')
   mkdirSync(dir, { recursive: true })
   db = openDatabase(join(dir, 'sonora.db'))
+  // banco abriu: dados antigos de uma restauração anterior já podem ser descartados
+  const leftovers = cleanupRestoreLeftovers(dir)
+  for (const p of leftovers.stranded) console.warn('[sonora] restauração interrompida; dados originais em:', p)
   handle('app:version', () => app.getVersion())
   const songs = createSongsRepo(db)
   handle('songs:list', (query?: string) => songs.list(query))
@@ -218,8 +221,15 @@ app.whenReady().then(() => {
         }
       })
     } catch (err) {
-      // banco já fechado (falha na troca, que se desfaz sozinha): reinicia para reabrir os dados antigos
+      // banco já fechado (falha na troca): avisa e só então reinicia para reabrir os dados
       if (!db) {
+        await dialog.showMessageBox({
+          type: 'error',
+          title: strings.backup.failedTitle,
+          message: strings.backup.failedMessage,
+          detail: err instanceof Error ? err.message : String(err),
+          buttons: [strings.backup.failedOk]
+        })
         app.relaunch()
         app.exit()
       }

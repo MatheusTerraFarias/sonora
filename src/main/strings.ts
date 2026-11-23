@@ -19,7 +19,10 @@ export const strings = {
     confirmMessage: 'Restaurar este backup vai substituir todos os dados atuais (músicas, cultos, mídias e Bíblias).',
     confirmDetail: 'O Sonora será reiniciado. Esta ação não pode ser desfeita.',
     confirmYes: 'Restaurar e reiniciar',
-    confirmNo: 'Cancelar'
+    confirmNo: 'Cancelar',
+    failedTitle: 'Falha ao restaurar',
+    failedMessage: 'Não foi possível concluir a restauração. O Sonora será reiniciado.',
+    failedOk: 'Reiniciar'
   },
   services: {
     removedItem: 'Item removido'

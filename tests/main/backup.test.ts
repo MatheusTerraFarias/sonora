@@ -109,3 +109,153 @@ test('entradas com ".." ou caminho absoluto (zip-slip) são rejeitadas sem escre
   expectUntouched()
   expect(existsSync(join(dstDir, 'sonora.db'))).toBe(false)
 })
+
+// ---- caminhos arriscados da restauração ----
+import { cpSync, readdirSync } from 'node:fs'
+import { renameSync } from 'node:fs'
+import { cleanupRestoreLeftovers } from '../../src/main/backup'
+
+async function makeBackup(): Promise<string> {
+  const target = join(root, 'ok.sonora')
+  await exportBackup(db, srcDir, target)
+  return target
+}
+
+function seedDst(): void {
+  const d = openDatabase(join(dstDir, 'sonora.db'))
+  createSongsRepo(d).create({ title: 'Original', artist: 'A', key: null, tags: [], lyrics: 'x', attachment: { kind: 'none' } } as never)
+  d.close()
+  mkdirSync(join(dstDir, 'media'), { recursive: true })
+  mkdirSync(join(dstDir, 'bible'), { recursive: true })
+  writeFileSync(join(dstDir, 'media', 'orig.png'), 'orig')
+  writeFileSync(join(dstDir, 'bible', 'orig.json'), 'orig-bible')
+}
+
+function expectOriginalIntact(): void {
+  expect(readFileSync(join(dstDir, 'media', 'orig.png'), 'utf8')).toBe('orig')
+  expect(readFileSync(join(dstDir, 'bible', 'orig.json'), 'utf8')).toBe('orig-bible')
+  const d = openDatabase(join(dstDir, 'sonora.db'))
+  try {
+    expect(createSongsRepo(d).list().map((s) => s.title)).toEqual(['Original'])
+  } finally {
+    d.close()
+  }
+}
+
+const eperm = (): Error => Object.assign(new Error('EPERM'), { code: 'EPERM' })
+
+test('rename de media/ para _old falha: nada do original é apagado', async () => {
+  seedDst()
+  const file = await makeBackup()
+  const rename = (a: string, b: string): void => {
+    if (a.endsWith('media') && b.includes('_old')) throw eperm()
+    renameSync(a, b)
+  }
+  await expect(restoreBackup(file, dstDir, { rename })).rejects.toThrow(/RESTORE_FAILED:/)
+  expectOriginalIntact()
+})
+
+test('falha ao colocar o novo item desfaz a troca e preserva o original', async () => {
+  seedDst()
+  const file = await makeBackup()
+  const rename = (a: string, b: string): void => {
+    if (a.includes(`${'new'}`) && a.endsWith('media')) throw eperm()
+    renameSync(a, b)
+  }
+  await expect(restoreBackup(file, dstDir, { rename })).rejects.toThrow(/RESTORE_FAILED:/)
+  expectOriginalIntact()
+  expect(readdirSync(dstDir).filter((n) => n.startsWith('.restore-'))).toEqual([])
+})
+
+test('falha no desfazer mantém a pasta de preparo e informa o caminho dos dados originais', async () => {
+  seedDst()
+  const file = await makeBackup()
+  const rename = (a: string, b: string): void => {
+    if (a.endsWith('media') && a.includes('new')) throw eperm()
+    if (a.includes('_old') && a.endsWith('bible')) throw eperm()
+    renameSync(a, b)
+  }
+  const err = await restoreBackup(file, dstDir, { rename }).catch((e: Error) => e)
+  expect(err).toBeInstanceOf(Error)
+  expect((err as Error).message).toMatch(/_old/)
+  const stage = readdirSync(dstDir).find((n) => n.startsWith('.restore-stage-'))!
+  expect(readFileSync(join(dstDir, stage, '_old', 'bible', 'orig.json'), 'utf8')).toBe('orig-bible')
+  expect(cleanupRestoreLeftovers(dstDir).stranded.length).toBe(1)
+  expect(existsSync(join(dstDir, stage))).toBe(true)
+})
+
+test('beforeSwap que lança não altera os dados', async () => {
+  seedDst()
+  const file = await makeBackup()
+  await expect(
+    restoreBackup(file, dstDir, {
+      beforeSwap: () => {
+        throw new Error('boom')
+      }
+    })
+  ).rejects.toThrow('boom')
+  expectOriginalIntact()
+  expect(readdirSync(dstDir).filter((n) => n.startsWith('.restore-'))).toEqual([])
+})
+
+test('substitui sonora.db existente e remove -wal/-shm antigos', async () => {
+  seedDst()
+  writeFileSync(join(dstDir, 'sonora.db-wal'), 'wal')
+  writeFileSync(join(dstDir, 'sonora.db-shm'), 'shm')
+  const file = await makeBackup()
+  await restoreBackup(file, dstDir)
+  expect(existsSync(join(dstDir, 'sonora.db-wal'))).toBe(false)
+  expect(existsSync(join(dstDir, 'sonora.db-shm'))).toBe(false)
+  const d = openDatabase(join(dstDir, 'sonora.db'))
+  try {
+    expect(createSongsRepo(d).list().map((s) => s.title)).toEqual(['Grande é o Senhor'])
+  } finally {
+    d.close()
+  }
+})
+
+test('backup sem media/ e bible/ restaura só o banco', async () => {
+  rmSync(join(srcDir, 'media'), { recursive: true })
+  rmSync(join(srcDir, 'bible'), { recursive: true })
+  const file = await makeBackup()
+  await restoreBackup(file, dstDir)
+  expect(existsSync(join(dstDir, 'sonora.db'))).toBe(true)
+})
+
+test('sonora.db corrompido lança InvalidBackupError e nada muda', async () => {
+  seedDst()
+  for (const bad of [Buffer.from('isto nao e sqlite'), Buffer.concat([Buffer.from('SQLite format 3\0'), Buffer.alloc(200, 7)])]) {
+    const zip = new AdmZip()
+    zip.addFile('manifest.json', Buffer.from(JSON.stringify({ app: 'sonora', version: '1', createdAt: 'x' })))
+    zip.addFile('sonora.db', bad)
+    const f = join(root, 'corrupt.sonora')
+    zip.writeZip(f)
+    let called = false
+    const err = await restoreBackup(f, dstDir, { beforeSwap: () => void (called = true) }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(InvalidBackupError)
+    expect((err as Error).message).toMatch(/^INVALID_BACKUP:/)
+    expect(called).toBe(false)
+    expectOriginalIntact()
+    expect(readdirSync(dstDir).filter((n) => n.startsWith('.restore-'))).toEqual([])
+  }
+})
+
+test('após sucesso os dados antigos ficam em .restore-old-* e cleanupRestoreLeftovers os apaga', async () => {
+  seedDst()
+  const file = await makeBackup()
+  await restoreBackup(file, dstDir, { now: () => 123 })
+  const old = join(dstDir, '.restore-old-123')
+  expect(readFileSync(join(old, 'media', 'orig.png'), 'utf8')).toBe('orig')
+  expect(readdirSync(dstDir).filter((n) => n.startsWith('.restore-stage-'))).toEqual([])
+  const r = cleanupRestoreLeftovers(dstDir)
+  expect(r.removed).toEqual([old])
+  expect(existsSync(old)).toBe(false)
+  expect(existsSync(join(dstDir, 'media', 'a.png'))).toBe(true)
+})
+
+test('exportBackup não deixa .tmp', async () => {
+  const f = await makeBackup()
+  expect(existsSync(f)).toBe(true)
+  expect(existsSync(`${f}.tmp`)).toBe(false)
+  cpSync(f, join(root, 'copy.sonora'))
+})

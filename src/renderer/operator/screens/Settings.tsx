@@ -115,8 +115,8 @@ export function Settings(): JSX.Element {
     setBusy('restore')
     setMessage(null)
     const r = await run(() => window.sonora.backup.restore())
-    // o main rejeita (InvalidBackupError) sem tocar nos dados; o aviso explica o motivo provável
-    if (!r.ok) setMessage(S.restoreInvalid)
+    // o IPC perde a classe do erro: o main marca backups inválidos com um prefixo reconhecível
+    if (!r.ok) setMessage(r.message.includes('INVALID_BACKUP:') ? S.restoreInvalid : S.restoreFailed)
     setBusy(null)
   }
 
