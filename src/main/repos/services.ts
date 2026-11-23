@@ -16,11 +16,25 @@ interface ItemRow {
   data: string
 }
 
+const KINDS = ['song', 'bible', 'media', 'youtube', 'notice']
+
+/** dado ilegível vira referência a uma música inexistente, que resolve como "Item removido" */
+const CORRUPT_DATA: ServiceItemData = { kind: 'song', songId: '' }
+
+const parseData = (raw: string): ServiceItemData => {
+  try {
+    const d = JSON.parse(raw)
+    return d && typeof d === 'object' && KINDS.includes(d.kind) ? (d as ServiceItemData) : CORRUPT_DATA
+  } catch {
+    return CORRUPT_DATA
+  }
+}
+
 const toItem = (r: ItemRow): ServiceItem => ({
   id: r.id,
   serviceId: r.service_id,
   position: r.position,
-  data: JSON.parse(r.data) as ServiceItemData
+  data: parseData(r.data)
 })
 
 const refIdOf = (data: ServiceItemData): string | null =>
@@ -157,7 +171,7 @@ export type ServicesRepo = ReturnType<typeof createServicesRepo>
 
 export interface ResolveDeps {
   songs: { get(id: ID): Pick<Song, 'title'> | null }
-  media: { list(): Pick<MediaItem, 'id' | 'originalName'>[] }
+  media: { get(id: ID): Pick<MediaItem, 'id' | 'originalName'> | null }
 }
 
 /** Resolve um item do culto para exibição; `missing` quando a música/mídia referenciada não existe mais. */
@@ -170,7 +184,7 @@ export function resolveItem(item: ServiceItem, deps: ResolveDeps): ResolvedItem 
       return song ? { item, missing: false, title: song.title } : removed
     }
     case 'media': {
-      const m = deps.media.list().find((x) => x.id === d.mediaId)
+      const m = deps.media.get(d.mediaId)
       return m ? { item, missing: false, title: m.originalName } : removed
     }
     case 'bible':

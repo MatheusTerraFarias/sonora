@@ -58,6 +58,11 @@ export function createMediaRepo(db: Db, mediaDir: string) {
       return rows.map(toItem)
     },
 
+    get(id: ID): MediaItem | null {
+      const row = db.prepare('SELECT * FROM media WHERE id = ?').get(id) as MediaRow | undefined
+      return row ? toItem(row) : null
+    },
+
     importFile(path: string): MediaItem {
       const ext = extname(path).toLowerCase()
       const type = TYPES[ext]

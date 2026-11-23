@@ -63,3 +63,9 @@ test('remove apaga registro e arquivo', () => {
   expect(repo.filePath(m.id)).toBeNull()
   expect(() => repo.remove(m.id)).not.toThrow()
 })
+
+test('get devolve o item por id ou null', () => {
+  const item = repo.importFile(fake('a.png'))
+  expect(repo.get(item.id)).toEqual(item)
+  expect(repo.get('nao-existe')).toBeNull()
+})

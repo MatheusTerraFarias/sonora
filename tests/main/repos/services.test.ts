@@ -77,7 +77,7 @@ test('resolveItem: música apagada fica missing com "Item removido"', () => {
   const song = songs.create({ title: 'Grande é o Senhor', artist: '', key: null, tags: [], lyrics: '[Verso]\nLinha', attachment: null } as any)
   const s = repo.create('C', '2026-11-22')
   const item = repo.addItem(s.id, { kind: 'song', songId: song.id })
-  const deps = { songs: { get: (id: string) => songs.get(id) }, media: { list: () => [] } }
+  const deps = { songs: { get: (id: string) => songs.get(id) }, media: { get: () => null } }
   expect(resolveItem(item, deps)).toEqual({ item, missing: false, title: 'Grande é o Senhor' })
   songs.remove(song.id)
   const r = resolveItem(item, deps)
@@ -88,7 +88,7 @@ test('resolveItem: música apagada fica missing com "Item removido"', () => {
 
 test('resolveItem: outros tipos e mídia ausente', () => {
   const s = repo.create('C', '2026-11-22')
-  const deps = { songs: { get: () => null }, media: { list: () => [{ id: 'm1', originalName: 'foto.png' }] as any } }
+  const deps = { songs: { get: () => null }, media: { get: (id: string) => (id === 'm1' ? ({ id: 'm1', originalName: 'foto.png' } as any) : null) } }
   const bible = repo.addItem(s.id, { kind: 'bible', ref: 'João 3:16', translation: 'ara' })
   const yt = repo.addItem(s.id, { kind: 'youtube', videoId: 'v', title: 'Vídeo', thumbnail: '' })
   const n = repo.addItem(s.id, notice('Aviso'))
@@ -111,4 +111,20 @@ test('favoritos: repetido não duplica; remove', () => {
   expect(fav.list()).toHaveLength(2)
   fav.remove('abc')
   expect(fav.list().map((f) => f.videoId)).toEqual(['def'])
+})
+
+test('dado corrompido não quebra o culto: item resolve como removido', () => {
+  const s = repo.create('C', '2026-11-22')
+  const ok = repo.addItem(s.id, notice('ok'))
+  const bad = repo.addItem(s.id, notice('x'))
+  const unknown = repo.addItem(s.id, notice('y'))
+  db.prepare('UPDATE service_items SET data = ? WHERE id = ?').run('{nao-json', bad.id)
+  db.prepare('UPDATE service_items SET data = ? WHERE id = ?').run('{"kind":"alien"}', unknown.id)
+  const got = repo.get(s.id)!
+  expect(got.items).toHaveLength(3)
+  const deps = { songs: { get: () => null }, media: { get: () => null } }
+  const r = got.items.map((i) => resolveItem(i, deps))
+  expect(r.map((x) => x.missing)).toEqual([false, true, true])
+  expect(r[1]!.title).toBe('Item removido')
+  expect(r[0]!.item.id).toBe(ok.id)
 })
