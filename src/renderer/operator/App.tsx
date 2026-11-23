@@ -1,12 +1,37 @@
-import logo from '../shared/assets/logo-horizontal-escuro.svg'
 import { strings } from '../shared/strings'
+import { Sidebar } from './components/Sidebar'
+import { Bible } from './screens/Bible'
+import { ComingSoon } from './screens/ComingSoon'
+import { Media } from './screens/Media'
+import { Notices } from './screens/Notices'
+import { Songs } from './screens/Songs'
+import { useOperatorStore, type Section } from './store'
+import './operator.css'
+
+function Screen({ section }: { section: Section }): JSX.Element {
+  switch (section) {
+    case 'songs':
+      return <Songs />
+    case 'bible':
+      return <Bible />
+    case 'media':
+      return <Media />
+    case 'notices':
+      return <Notices />
+    default:
+      // Tasks 12-14 substituem estes marcadores
+      return <ComingSoon title={strings.nav[section]} />
+  }
+}
 
 export function App(): JSX.Element {
+  const section = useOperatorStore((s) => s.section)
   return (
-    <main style={{ display: 'grid', placeItems: 'center', height: '100%', gap: 16, alignContent: 'center' }}>
-      <img src={logo} alt={strings.app.name} style={{ height: 64 }} />
-      <h1 style={{ margin: 0, fontWeight: 600 }}>{strings.operator.welcome}</h1>
-      <p style={{ margin: 0, opacity: 0.7 }}>{strings.operator.ready}</p>
-    </main>
+    <div className="shell">
+      <Sidebar />
+      <main className="shell__main">
+        <Screen section={section} />
+      </main>
+    </div>
   )
 }
