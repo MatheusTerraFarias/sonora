@@ -39,3 +39,16 @@ test('serialize → parse com partes sem marcador (Parte N)', () => {
   const text = serializeLyrics(parts, first.arrangement.map((i) => `p${i}`))
   expect(parseLyrics(text)).toEqual(first)
 })
+
+test('partes fora do arranjo não se perdem; arranjo volta à ordem do texto', () => {
+  const parts = [
+    { id: 'a', label: 'Estrofe 1', slides: ['A'] },
+    { id: 'b', label: 'Ponte', slides: ['B'] },
+    { id: 'c', label: 'Refrão', slides: ['C'] }
+  ]
+  const text = serializeLyrics(parts, ['a', 'c'])
+  expect(text).toContain('[Ponte]\nB')
+  const r = parseLyrics(text)
+  expect(r.parts.map((p) => p.label)).toEqual(['Estrofe 1', 'Refrão', 'Ponte'])
+  expect(r.arrangement).toEqual([0, 1, 2])
+})

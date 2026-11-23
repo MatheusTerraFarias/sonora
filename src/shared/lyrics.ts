@@ -86,6 +86,9 @@ export function parseLyrics(text: string): { parts: Omit<SongPart, 'id'>[]; arra
   return { parts, arrangement }
 }
 
+const fullBlock = (part: SongPart): string =>
+  [`[${part.label}]`, part.slides.join('\n\n')].filter((s) => s !== '').join('\n')
+
 /** Inverso de parseLyrics: conteúdo na primeira aparição, só o marcador nas repetições. */
 export function serializeLyrics(parts: SongPart[], arrangement: ID[]): string {
   const byId = new Map(parts.map((p) => [p.id, p]))
@@ -102,7 +105,9 @@ export function serializeLyrics(parts: SongPart[], arrangement: ID[]): string {
       continue
     }
     shown.add(id)
-    blocks.push([head, part.slides.join('\n\n')].filter((s) => s !== '').join('\n'))
+    blocks.push(fullBlock(part))
   }
+  // partes fora do arranjo não se perdem: o texto é a fonte da verdade
+  for (const part of parts) if (!shown.has(part.id)) blocks.push(fullBlock(part))
   return blocks.join('\n\n')
 }
