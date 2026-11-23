@@ -1,9 +1,10 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, dialog, shell } from 'electron'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { openDatabase, type Db } from './db/database'
 import { handle } from './ipc'
 import { createSongsRepo, type SongInput } from './repos/songs'
+import { createBibleStore } from './bible/bibleStore'
 
 let db: Db | null = null
 
@@ -51,6 +52,26 @@ app.whenReady().then(() => {
   handle('songs:update', (id: string, input: SongInput) => songs.update(id, input))
   handle('songs:setArrangement', (id: string, arrangement: string[]) => songs.setArrangement(id, arrangement))
   handle('songs:remove', (id: string) => songs.remove(id))
+  const bundledBible = app.isPackaged ? join(process.resourcesPath, 'bible') : join(app.getAppPath(), 'resources/bible')
+  const bible = createBibleStore(join(dir, 'bible'), [bundledBible])
+  handle('bible:translations', () => bible.translations())
+  handle('bible:importTranslation', async (file?: string) => {
+    let path = file
+    if (!path) {
+      const r = await dialog.showOpenDialog({
+        title: 'Importar tradução da Bíblia',
+        filters: [{ name: 'Bíblia (JSON)', extensions: ['json'] }],
+        properties: ['openFile']
+      })
+      if (r.canceled || !r.filePaths[0]) return null
+      path = r.filePaths[0]
+    }
+    return bible.importTranslation(path)
+  })
+  handle('bible:passage', (translationId: string, ref: string) => bible.passage(translationId, ref))
+  handle('bible:search', (translationId: string, words: string, limit?: number) =>
+    bible.search(translationId, words, limit)
+  )
   createOperatorWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createOperatorWindow()

@@ -1,0 +1,41 @@
+{
+  "id": "TESTE",
+  "name": "Tradução de Teste",
+  "license": "Domínio público (fixture)",
+  "books": [
+    {
+      "id": "JHN",
+      "name": "João",
+      "abbrev": ["jo"],
+      "chapters": [
+        ["No princípio era o Verbo.", "Ele estava no princípio com Deus."],
+        ["Houve umas bodas em Caná."],
+        [
+          "Havia um homem fariseu.",
+          "Este foi ter com Jesus de noite.",
+          "Respondeu Jesus: Em verdade te digo.",
+          "Como pode um homem nascer sendo velho?",
+          "Jesus respondeu: Quem não nascer da água e do Espírito.",
+          "O que é nascido da carne é carne.",
+          "Não te maravilhes.",
+          "O vento assopra onde quer.",
+          "Nicodemos perguntou: Como pode ser isto?",
+          "Respondeu Jesus: Tu és mestre em Israel.",
+          "Em verdade te digo que falamos do que sabemos.",
+          "Se vos falei de coisas terrenas.",
+          "Ninguém subiu ao céu.",
+          "E como Moisés levantou a serpente no deserto.",
+          "Para que todo aquele que nele crê tenha a vida eterna.",
+          "Porque Deus amou ao mundo de tal maneira que deu o seu Filho unigênito.",
+          "Porque Deus enviou o seu Filho ao mundo para que o mundo fosse salvo."
+        ]
+      ]
+    },
+    {
+      "id": "EPH",
+      "name": "Efésios",
+      "abbrev": ["ef"],
+      "chapters": [["Paulo, apóstolo.", "Graça e paz a vós."], ["Pela graça sois salvos, mediante a fé."]]
+    }
+  ]
+}

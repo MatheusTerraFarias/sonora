@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ID, Song } from '../shared/types'
 import type { SongInput } from '../main/repos/songs'
+import type { TranslationInfo } from '../main/bible/bibleStore'
+import type { Passage } from '../shared/slides'
 
 const call =
   (channel: string) =>
@@ -22,6 +24,17 @@ export const api = {
     update: call('songs:update') as (id: ID, input: SongInput) => Promise<Song>,
     setArrangement: call('songs:setArrangement') as (id: ID, arrangement: ID[]) => Promise<Song>,
     remove: call('songs:remove') as (id: ID) => Promise<void>
+  },
+  bible: {
+    translations: call('bible:translations') as () => Promise<TranslationInfo[]>,
+    /** sem `file`, abre o seletor de arquivos; null se cancelado */
+    importTranslation: call('bible:importTranslation') as (file?: string) => Promise<TranslationInfo | null>,
+    passage: call('bible:passage') as (translationId: string, ref: string) => Promise<Passage | null>,
+    search: call('bible:search') as (
+      translationId: string,
+      words: string,
+      limit?: number
+    ) => Promise<{ ref: string; text: string }[]>
   },
   /** Assina um evento enviado pelo main. Retorna a função de cancelamento. */
   on(channel: string, cb: (...args: any[]) => void): () => void {

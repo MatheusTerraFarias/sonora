@@ -1,0 +1,17 @@
+Bíblia Livre (BLIVRE)
+Copyright © 2018 Diego Santos, Mario Sérgio, e Marco Teles
+http://sites.google.com/site/biblialivre/ - fevereiro de 2018
+
+Licença: Creative Commons Atribuição 4.0 Brasil (CC BY 4.0)
+http://creativecommons.org/licenses/by/4.0/br/
+(O repositório oficial https://github.com/blivre/BibliaLivre cita CC BY 3.0 Brasil; ambas exigem atribuição.)
+
+Todas as Escrituras em português citadas são da Bíblia Livre (BLIVRE), Copyright © Diego Santos, Mario Sérgio, e Marco Teles. Reprodução permitida desde que devidamente mencionados fonte e autores. A Bíblia Livre é um trabalho em andamento, por isso sempre indique a data correta da versão.
+
+Fonte do texto usado neste aplicativo: eBible.org, "porbr2018_vpl" (https://ebible.org/porbr2018/copyright.htm).
+Alterações: o texto foi convertido de "um versículo por linha" para JSON (scripts/convert-bible.mjs); os códigos dos livros foram mapeados para USFM. O conteúdo dos versículos não foi alterado.
+
+This translation is made available to you under the terms of the Creative Commons Attribution license 4.0.
+You may share and redistribute this Bible translation or extracts from it in any format, provided that:
+ - You include the above copyright and source information.
+ - If you make any changes to the text, you must indicate that you did so in a way that makes it clear that the original licensor is not necessarily endorsing your changes.

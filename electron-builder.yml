@@ -6,6 +6,9 @@ directories:
 files:
   - out/**
   - package.json
+extraResources:
+  - from: resources/bible
+    to: bible
 asarUnpack:
   - node_modules/better-sqlite3/**
 win:
