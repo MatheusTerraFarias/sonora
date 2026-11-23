@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ID, MediaItem, MediaKind, ResolvedItem, Service, ServiceItem, ServiceItemData, Song } from '../shared/types'
+import type { ID, MediaItem, MediaKind, ResolvedItem, Service, ServiceItem, ServiceItemData, Settings, Song } from '../shared/types'
 import type { SongInput } from '../main/repos/songs'
 import type { TranslationInfo } from '../main/bible/bibleStore'
 import type { YoutubeFavorite } from '../main/repos/favorites'
@@ -9,6 +9,15 @@ const call =
   (channel: string) =>
   (...args: unknown[]): Promise<any> =>
     ipcRenderer.invoke(channel, ...args)
+
+/** Assina um evento enviado pelo main. Retorna a função de cancelamento. */
+function on(channel: string, cb: (...args: any[]) => void): () => void {
+  const listener = (_event: Electron.IpcRendererEvent, ...args: any[]): void => cb(...args)
+  ipcRenderer.on(channel, listener)
+  return () => {
+    ipcRenderer.removeListener(channel, listener)
+  }
+}
 
 /**
  * Cada task seguinte adiciona seu grupo (songs, bible, media, services,
@@ -63,14 +72,13 @@ export const api = {
     add: call('favorites:add') as (v: YoutubeFavorite) => Promise<void>,
     remove: call('favorites:remove') as (videoId: string) => Promise<void>
   },
-  /** Assina um evento enviado pelo main. Retorna a função de cancelamento. */
-  on(channel: string, cb: (...args: any[]) => void): () => void {
-    const listener = (_event: Electron.IpcRendererEvent, ...args: any[]): void => cb(...args)
-    ipcRenderer.on(channel, listener)
-    return () => {
-      ipcRenderer.removeListener(channel, listener)
-    }
-  }
+  settings: {
+    get: call('settings:get') as () => Promise<Settings>,
+    update: call('settings:update') as (patch: Partial<Settings>) => Promise<Settings>,
+    /** recebe o settings completo sempre que algo é alterado; retorna a função de cancelamento */
+    onChange: (cb: (s: Settings) => void): (() => void) => on('settings:changed', cb)
+  },
+  on
 }
 
 export type SonoraApi = typeof api

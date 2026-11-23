@@ -9,8 +9,9 @@ import { createMediaRepo, MEDIA_EXTENSIONS } from './repos/media'
 import { handleMediaProtocol, registerMediaScheme } from './media/protocol'
 import { createServicesRepo, resolveItem } from './repos/services'
 import { createFavoritesRepo, type YoutubeFavorite } from './repos/favorites'
+import { createSettingsRepo } from './repos/settings'
 import { strings } from './strings'
-import type { MediaKind, ServiceItemData } from '../shared/types'
+import type { MediaKind, ServiceItemData, Settings } from '../shared/types'
 
 registerMediaScheme()
 
@@ -117,6 +118,12 @@ app.whenReady().then(() => {
   handle('favorites:list', () => favorites.list())
   handle('favorites:add', (v: YoutubeFavorite) => favorites.add(v))
   handle('favorites:remove', (videoId: string) => favorites.remove(videoId))
+  const settings = createSettingsRepo(db)
+  handle('settings:get', () => settings.get())
+  handle('settings:update', (patch: Partial<Settings>) => settings.update(patch))
+  settings.onChange((s) => {
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('settings:changed', s)
+  })
   createOperatorWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createOperatorWindow()
