@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { openDatabase, type Db } from './db/database'
@@ -15,8 +15,9 @@ import { strings } from './strings'
 import { createOperatorWindow } from './windows/operatorWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
 import { createProjectionBrowserWindow } from './windows/projectionWindowFactory'
+import { fetchOembed, hardenWebviews } from './youtube/session'
 import type { DisplayInfo } from '../shared/displays'
-import type { LiveState, MediaKind, Overlay, ServiceItemData, Settings } from '../shared/types'
+import type { LiveProgress, LiveState, MediaKind, Overlay, ServiceItemData, Settings } from '../shared/types'
 
 registerMediaScheme()
 
@@ -27,7 +28,20 @@ function broadcast(channel: string, payload: unknown): void {
   for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload)
 }
 
+/** liga/desliga o bloqueador; com SONORA_ADBLOCK=0 o módulo nem entra no build */
+async function applyAdblock(enabled: boolean): Promise<void> {
+  if (!__ADBLOCK__) return
+  try {
+    const { setAdblock } = await import('./youtube/adblock')
+    await setAdblock(enabled)
+  } catch (err) {
+    console.warn('[sonora] bloqueador de anúncios indisponível:', err)
+  }
+}
+
 app.whenReady().then(() => {
+  let operatorWin: BrowserWindow | null = null
+  hardenWebviews((embedder) => !!operatorWin && !operatorWin.isDestroyed() && embedder === operatorWin.webContents)
   const dir = app.getPath('userData')
   mkdirSync(dir, { recursive: true })
   db = openDatabase(join(dir, 'sonora.db'))
@@ -102,6 +116,14 @@ app.whenReady().then(() => {
   settings.onChange((s) => {
     broadcast('settings:changed', s)
   })
+  let adblockOn = settings.get().adblockEnabled
+  if (adblockOn) void applyAdblock(true)
+  settings.onChange((s) => {
+    if (s.adblockEnabled === adblockOn) return
+    adblockOn = s.adblockEnabled
+    void applyAdblock(adblockOn)
+  })
+  handle('youtube:oembed', (videoId: string) => fetchOembed(String(videoId)))
   const live = new LiveController({
     services,
     resolveDeps: { songs, media },
@@ -120,11 +142,20 @@ app.whenReady().then(() => {
   handle('live:loadService', (serviceId: string) => live.loadService(serviceId))
   handle('live:outline', () => live.outline())
   handle('live:setOnline', (online: boolean) => live.setOnline(online))
-  const operatorWin = createOperatorWindow()
-  operatorWin.on('closed', () => app.quit())
+  const opWin = createOperatorWindow()
+  operatorWin = opWin
+  opWin.on('closed', () => app.quit())
+  // progresso de reprodução informado pelo telão: só repassado ao operador (não altera LiveState.position)
+  ipcMain.on('live:progress', (event, p: LiveProgress) => {
+    if (event.sender === opWin.webContents || opWin.isDestroyed() || !p || typeof p.key !== 'string') return
+    const position = Number(p.position)
+    const duration = Number(p.duration)
+    if (!Number.isFinite(position) || !Number.isFinite(duration)) return
+    opWin.webContents.send('live:progress', { key: p.key, position, duration } satisfies LiveProgress)
+  })
   const primaryId = (): number => screen.getPrimaryDisplay().id
   const operatorDisplayId = (): number =>
-    operatorWin.isDestroyed() ? primaryId() : screen.getDisplayMatching(operatorWin.getBounds()).id
+    opWin.isDestroyed() ? primaryId() : screen.getDisplayMatching(opWin.getBounds()).id
   const projection = new ProjectionWindowManager({
     getDisplays: () => screen.getAllDisplays().map((d) => ({ id: d.id, primary: d.id === primaryId(), bounds: d.bounds })),
     getOperatorDisplayId: operatorDisplayId,
@@ -159,7 +190,7 @@ app.whenReady().then(() => {
   screen.on('display-added', () => syncProjection())
   screen.on('display-removed', () => syncProjection())
   screen.on('display-metrics-changed', () => syncProjection())
-  operatorWin.on('moved', () => syncProjection())
+  opWin.on('moved', () => syncProjection())
   syncProjection()
   app.on('before-quit', () => projection.destroy())
 })

@@ -18,7 +18,9 @@ export function createProjectionBrowserWindow(
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      // player do YouTube; endurecido em hardenWebviews (main/youtube/session.ts)
+      webviewTag: true
     }
   })
   win.setBounds(display.bounds)

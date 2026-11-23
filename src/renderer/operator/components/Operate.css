@@ -254,3 +254,15 @@
   align-items: flex-start;
   margin-top: 8px;
 }
+
+.order-item--offline .list__item {
+  opacity: 0.55;
+}
+.order-item__badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 154, 168, 0.18);
+  color: #ff9aa8;
+  white-space: nowrap;
+}

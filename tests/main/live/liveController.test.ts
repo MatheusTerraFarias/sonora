@@ -146,3 +146,45 @@ test('outline lista itens com slides e skip', () => {
   expect(o[1].skip).toBe(true)
   expect(o[2].slides).toEqual([])
 })
+
+test('culto [música, YouTube, aviso] sem internet: next pula o YouTube e goTo nele não muda o estado', () => {
+  const data: ServiceItemData[] = [
+    { kind: 'song', songId: 's1' },
+    { kind: 'youtube', videoId: 'dQw4w9WgXcQ', title: 'Y', thumbnail: '' },
+    { kind: 'notice', title: 'Aviso', body: 'corpo', backgroundMediaId: null }
+  ]
+  const items: ServiceItem[] = data.map((d, i) => ({ id: `k${i}`, serviceId: 'sv2', position: i, data: d }))
+  const song = { id: 's1', title: 'S', parts: [{ id: 'p1', label: 'E1', slides: ['a', 'b'] }], arrangement: ['p1'] }
+  const live = new LiveController({
+    services: { get: () => ({ id: 'sv2', name: 'n', date: 'd', items }) },
+    resolveDeps: { songs: { get: () => song }, media: { get: () => null } } as any,
+    song: () => song as any,
+    passage: () => null,
+    media: { get: () => null },
+    settings: { get: () => structuredClone(DEFAULT_SETTINGS), onChange: () => () => {} },
+    send: () => {}
+  })
+  live.loadService('sv2')
+  live.setOnline(false)
+  live.goTo('k0', 1)
+  live.next()
+  expect(live.get().cursor).toEqual({ itemId: 'k2', slideIndex: 0 })
+  expect(live.get().content).toMatchObject({ type: 'slide' })
+  const before = live.get()
+  live.goTo('k1', 0)
+  expect(live.get()).toBe(before)
+})
+
+test('media() com position incrementa seek, mesmo repetindo o valor', () => {
+  const { live } = setup()
+  live.goTo('i3', 0)
+  live.media({ position: 30 })
+  const a = (live.get().content as { seek?: number }).seek
+  live.media({ position: 30 })
+  const b = (live.get().content as { seek?: number }).seek
+  live.media({ volume: 0.2 })
+  const c = (live.get().content as { seek?: number }).seek
+  expect(a).toBe(1)
+  expect(b).toBe(2)
+  expect(c).toBe(2)
+})

@@ -140,7 +140,8 @@ export class LiveController {
         ...c,
         playing: cmd.play ?? c.playing,
         volume: cmd.volume ?? c.volume,
-        position: cmd.position ?? c.position
+        position: cmd.position ?? c.position,
+        seek: cmd.position === undefined ? c.seek : (c.seek ?? 0) + 1
       }
     }
     this.emit()

@@ -2,10 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fitFontSizeWithFloor } from '../../shared/fitText'
 import type { LiveContent, LiveState, Slide, TextStyle } from '../../shared/types'
 import { Background, mediaUrl } from './Background'
+import { YouTubePlayer } from './YouTubePlayer'
 
 const FADE_MS = 300
 const SAFE = 0.9
 const LINE_HEIGHT = 1.25
+/** intervalo mínimo entre relatos de progresso ao operador (~4 Hz) */
+const PROGRESS_MS = 250
 
 type MediaContent = Extract<LiveContent, { type: 'media' }>
 
@@ -157,17 +160,35 @@ function SlideLayers({ slide, style }: { slide: Slide | null; style: TextStyle }
 /** Mídia local controlada pelo estado: nada interativo, sem controles. */
 function MediaLayer({ content, sinkId }: { content: MediaContent; sinkId: string | null }): JSX.Element | null {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null)
-  const { media, playing, volume, position } = content
+  const { media, playing, volume, position, seek } = content
+  const lastReport = useRef(0)
 
   useEffect(() => {
     const el = ref.current
     if (el) el.volume = Math.min(1, Math.max(0, volume))
   }, [volume, media.id])
 
+  // só um pedido de posição do operador move o vídeo (`seek` muda a cada pedido)
   useEffect(() => {
     const el = ref.current
-    if (el && Math.abs(el.currentTime - position) > 1) el.currentTime = position
-  }, [position, media.id])
+    if (el && seek !== undefined) el.currentTime = position
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seek, media.id])
+
+  /** progresso real ao operador, no máximo a cada 250 ms (e sempre ao saber a duração) */
+  const report = (e: React.SyntheticEvent<HTMLMediaElement>, force = false): void => {
+    const el = e.currentTarget
+    const now = performance.now()
+    if (!force && now - lastReport.current < PROGRESS_MS) return
+    if (!Number.isFinite(el.duration) || el.duration <= 0) return
+    lastReport.current = now
+    window.sonora.live.reportProgress({ key: media.id, position: el.currentTime, duration: el.duration })
+  }
+  const progressProps = {
+    onTimeUpdate: (e: React.SyntheticEvent<HTMLMediaElement>) => report(e),
+    onDurationChange: (e: React.SyntheticEvent<HTMLMediaElement>) => report(e, true),
+    onSeeked: (e: React.SyntheticEvent<HTMLMediaElement>) => report(e, true)
+  }
 
   useEffect(() => {
     const el = ref.current
@@ -192,13 +213,8 @@ function MediaLayer({ content, sinkId }: { content: MediaContent; sinkId: string
     background: '#000'
   }
   if (media.kind === 'image') return <img src={src} style={fit} draggable={false} alt="" />
-  if (media.kind === 'video') return <video key={media.id} ref={ref} src={src} style={fit} playsInline />
-  return <audio key={media.id} ref={ref} src={src} />
-}
-
-/** Placeholder: a Tarefa 13 substitui isto pelo player do YouTube. */
-function YoutubePlaceholder(): JSX.Element | null {
-  return null
+  if (media.kind === 'video') return <video key={media.id} ref={ref} src={src} style={fit} playsInline {...progressProps} />
+  return <audio key={media.id} ref={ref} src={src} {...progressProps} />
 }
 
 function Overlay({ live }: { live: LiveState }): JSX.Element {
@@ -233,6 +249,8 @@ function Overlay({ live }: { live: LiveState }): JSX.Element {
 export function Telao(): JSX.Element {
   const [live, setLive] = useState<LiveState | null>(null)
   const [sinkId, setSinkId] = useState<string | null>(null)
+  /** último conteúdo que não é YouTube: continua no telão enquanto o portão do YouTube está fechado */
+  const behind = useRef<LiveContent>({ type: 'none' })
 
   useEffect(() => {
     let gotEvent = false
@@ -260,7 +278,11 @@ export function Telao(): JSX.Element {
   if (!live) return <div style={{ position: 'fixed', inset: 0, background: '#000' }} />
 
   const { content, overlay } = live
-  const slide = content.type === 'slide' ? content.slide : null
+  if (content.type !== 'youtube') behind.current = content
+  // sob o YouTube fica o slide ou a imagem anterior (vídeo/áudio anterior não: só o fundo)
+  const shown = content.type === 'youtube' ? behind.current : content
+  const slide = shown.type === 'slide' ? shown.slide : null
+  const stillImage = content.type === 'youtube' && shown.type === 'media' && shown.media.kind === 'image' ? shown : null
 
   return (
     <div
@@ -278,7 +300,8 @@ export function Telao(): JSX.Element {
         <SlideLayers slide={slide} style={live.style} />
       </div>
       {content.type === 'media' ? <MediaLayer content={content} sinkId={sinkId} /> : null}
-      {content.type === 'youtube' ? <YoutubePlaceholder /> : null}
+      {stillImage ? <MediaLayer content={stillImage} sinkId={sinkId} /> : null}
+      {content.type === 'youtube' ? <YouTubePlayer key={content.videoId} content={content} /> : null}
       <Overlay live={live} />
     </div>
   )

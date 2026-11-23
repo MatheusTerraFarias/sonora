@@ -167,6 +167,26 @@ export const strings = {
     pause: 'Pausar',
     volume: 'Volume',
     position: 'Posição',
-    unknownTime: '--:--'
+    unknownTime: '--:--',
+    offline: 'Sem internet',
+    offlineHint: 'Sem internet: vídeos do YouTube não vão ao telão. O resto do culto segue normal.'
+  },
+  youtube: {
+    title: 'YouTube',
+    back: 'Voltar',
+    forward: 'Avançar',
+    home: 'Início',
+    browserLabel: 'Navegador do YouTube',
+    noVideo: 'Abra um vídeo para adicioná-lo ao culto ou aos favoritos.',
+    checking: 'Verificando o vídeo…',
+    notFound: 'Vídeo não encontrado.',
+    untitled: 'Vídeo do YouTube',
+    favorite: 'Favoritar',
+    favorited: 'Nos favoritos',
+    favorites: 'Favoritos',
+    noFavorites: 'Nenhum vídeo favoritado ainda.',
+    open: 'Abrir',
+    removeFavorite: 'Remover dos favoritos',
+    offline: 'Sem internet. O YouTube volta a funcionar quando a conexão voltar.'
   }
 } as const

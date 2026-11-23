@@ -1,8 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ID, LiveState, Slide, MediaItem, MediaKind, Overlay, ResolvedItem, Service, ServiceItem, ServiceItemData, Settings, Song } from '../shared/types'
+import type { ID, LiveProgress, LiveState, Slide, MediaItem, MediaKind, Overlay, ResolvedItem, Service, ServiceItem, ServiceItemData, Settings, Song } from '../shared/types'
 import type { SongInput } from '../main/repos/songs'
 import type { TranslationInfo } from '../main/bible/bibleStore'
 import type { YoutubeFavorite } from '../main/repos/favorites'
+import type { OembedInfo } from '../main/youtube/session'
 import type { Passage } from '../shared/slides'
 import type { DisplayInfo } from '../shared/displays'
 
@@ -91,7 +92,17 @@ export const api = {
     /** itens do culto carregado, com slides e `skip` */
     outline: call('live:outline') as () => Promise<{ itemId: ID; skip: boolean; slides: Slide[] }[]>,
     setOnline: call('live:setOnline') as (online: boolean) => Promise<void>,
-    onState: (cb: (s: LiveState) => void): (() => void) => on('live:state', cb)
+    onState: (cb: (s: LiveState) => void): (() => void) => on('live:state', cb),
+    /** telão → main: progresso real da reprodução (~4 Hz) */
+    reportProgress: (p: LiveProgress): void => ipcRenderer.send('live:progress', p),
+    /** operador: progresso repassado pelo main; retorna o cancelamento */
+    onProgress: (cb: (p: LiveProgress) => void): (() => void) => on('live:progress', cb)
+  },
+  youtube: {
+    /** título/canal/miniatura; null se o vídeo não existe (buscado no main) */
+    oembed: call('youtube:oembed') as (videoId: string) => Promise<OembedInfo | null>,
+    /** false quando o build foi gerado com SONORA_ADBLOCK=0 (a opção não aparece nas configurações) */
+    adblockAvailable: (): boolean => __ADBLOCK__
   },
   displays: {
     list: call('displays:list') as () => Promise<DisplayInfo[]>,

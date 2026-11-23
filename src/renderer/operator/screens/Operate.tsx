@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ID, LiveState, MediaItem, Overlay, ResolvedItem, Slide, SongAttachment } from '../../../shared/types'
+import type { ID, LiveProgress, LiveState, MediaItem, Overlay, ResolvedItem, Slide, SongAttachment } from '../../../shared/types'
 import type { DisplayInfo } from '../../../shared/displays'
 import { pickProjectionDisplay } from '../../../shared/displays'
 import { nextPosition } from '../../../shared/navigation'
@@ -23,6 +23,8 @@ interface OutlineEntry {
 /** Operação ao vivo: ordem do culto, grade de slides, prévia/ao vivo e botões de emergência. */
 export function Operate(): JSX.Element {
   const serviceId = useOperatorStore((s) => s.currentServiceId)
+  const online = useOperatorStore((s) => s.onlineStatus)
+  const [progress, setProgress] = useState<LiveProgress | null>(null)
   const [items, setItems] = useState<ResolvedItem[]>([])
   const [outline, setOutline] = useState<OutlineEntry[]>([])
   const [attachments, setAttachments] = useState<Record<ID, SongAttachment>>({})
@@ -44,11 +46,13 @@ export function Operate(): JSX.Element {
     const offDisplays = window.sonora.displays.onChange(setDisplays)
     void run(() => window.sonora.settings.get()).then((r) => r.ok && setSavedDisplayId(r.value.projectionDisplayId))
     const offSettings = window.sonora.settings.onChange((s) => setSavedDisplayId(s.projectionDisplayId))
+    const offProgress = window.sonora.live.onProgress(setProgress)
     void run(() => window.sonora.media.list()).then((r) => r.ok && setLibrary(r.value))
     return () => {
       offLive()
       offDisplays()
       offSettings()
+      offProgress()
     }
   }, [run])
 
@@ -84,6 +88,18 @@ export function Operate(): JSX.Element {
     setSelectedId(null)
     void refresh(serviceId)
   }, [serviceId, refresh])
+
+  // conexão mudou: o main já recalculou os `skip` (watchOnlineStatus); recarrega a ordem
+  const serviceRef = useRef(serviceId)
+  serviceRef.current = serviceId
+  const firstOnline = useRef(true)
+  useEffect(() => {
+    if (firstOnline.current) {
+      firstOnline.current = false
+      return
+    }
+    void refresh(serviceRef.current)
+  }, [online, refresh])
 
   // a seleção acompanha o item que vai ao ar; sem seleção, o primeiro item
   const cursorId = live?.cursor.itemId ?? null
@@ -167,6 +183,10 @@ export function Operate(): JSX.Element {
   const isMediaItem = selData?.kind === 'media' || selData?.kind === 'youtube'
   const mediaLive =
     selectedIsLive && (liveContent?.type === 'media' || liveContent?.type === 'youtube') ? liveContent : null
+  const liveKey =
+    liveContent?.type === 'media' ? liveContent.media.id : liveContent?.type === 'youtube' ? liveContent.videoId : null
+  const liveProgress = progress && progress.key === liveKey ? progress : null
+  const selectedOffline = selData?.kind === 'youtube' && !online
 
   if (!serviceId) {
     return (
@@ -182,6 +202,7 @@ export function Operate(): JSX.Element {
       <div className="operate__header">
         <h1 className="screen__title">{strings.operation.title}</h1>
         <ErrorBanner show={safe.error} />
+        {!online && <p className="hint">{strings.operation.offlineHint}</p>}
         {attachmentError && (
           <p className="hint hint--error" role="alert">
             {strings.operation.attachmentFailed}
@@ -198,6 +219,8 @@ export function Operate(): JSX.Element {
               const classes = ['order-item']
               if (r.missing) classes.push('order-item--missing')
               if (r.item.id === cursorId) classes.push('order-item--live')
+              const offline = r.item.data.kind === 'youtube' && !online
+              if (offline) classes.push('order-item--offline')
               return (
                 <li key={r.item.id} className={classes.join(' ')}>
                   <button
@@ -207,6 +230,7 @@ export function Operate(): JSX.Element {
                   >
                     <span className="order-item__kind">{strings.services.kind[r.item.data.kind]}</span>
                     <span className="order-item__title">{r.missing ? strings.operation.removedItem : r.title}</span>
+                    {offline && <span className="order-item__badge">{strings.operation.offline}</span>}
                   </button>
                   {att && (
                     <button type="button" className="btn" onClick={() => void projectAttachment(r, att)}>
@@ -235,14 +259,21 @@ export function Operate(): JSX.Element {
           {selected && !selected.missing && isMediaItem && (
             <>
               <div>
-                <button type="button" className="btn btn--primary" onClick={() => goTo(selected.item.id, 0)}>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={selectedOffline}
+                  onClick={() => goTo(selected.item.id, 0)}
+                >
                   {strings.operation.project}
                 </button>
+                {selectedOffline && <p className="hint">{strings.operation.offline}</p>}
               </div>
               <MediaControls
                 playing={mediaLive?.playing ?? false}
                 volume={mediaLive?.volume ?? 1}
-                position={mediaLive?.position ?? 0}
+                position={liveProgress?.position ?? mediaLive?.position ?? 0}
+                duration={mediaLive ? liveProgress?.duration : undefined}
                 disabled={!mediaLive}
                 onCommand={(cmd) => void run(() => window.sonora.live.media(cmd))}
               />
@@ -250,7 +281,7 @@ export function Operate(): JSX.Element {
           )}
         </div>
 
-        {live && <PreviewPanel live={live} next={next} />}
+        {live && <PreviewPanel live={live} next={next} progress={liveProgress} />}
       </div>
       <EmergencyBar overlay={live?.overlay ?? 'none'} monitorLabel={projection} onOverlay={overlayOf} />
     </section>

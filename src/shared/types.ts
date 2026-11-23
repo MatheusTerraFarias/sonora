@@ -71,9 +71,17 @@ export interface Slide {
 
 export type LiveContent =
   | { type: 'slide'; slide: Slide }
-  | { type: 'media'; media: MediaItem; playing: boolean; volume: number; position: number }
-  | { type: 'youtube'; videoId: string; playing: boolean; volume: number; position: number }
+  | { type: 'media'; media: MediaItem; playing: boolean; volume: number; position: number; seek?: number }
+  | { type: 'youtube'; videoId: string; playing: boolean; volume: number; position: number; seek?: number }
   | { type: 'none' };
+// `position` é o pedido de posição do operador; `seek` muda a cada pedido (o mesmo valor pode ser pedido de novo)
+
+/** progresso real da reprodução, informado pelo telão (~4 Hz); `key` = id da mídia ou do vídeo */
+export interface LiveProgress {
+  key: string;
+  position: number;
+  duration: number;
+}
 
 /** clear = esconde texto, mantém fundo */
 export type Overlay = 'none' | 'clear' | 'black' | 'logo';

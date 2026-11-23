@@ -1,6 +1,7 @@
-import { BrowserWindow, shell } from 'electron'
+import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { rendererUrl } from './rendererUrl'
+import { openExternalSafe } from '../youtube/session'
 
 export function createOperatorWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -15,12 +16,14 @@ export function createOperatorWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      // navegador do YouTube; endurecido em hardenWebviews (main/youtube/session.ts)
+      webviewTag: true
     }
   })
   win.once('ready-to-show', () => win.show())
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    openExternalSafe(url)
     return { action: 'deny' }
   })
   const url = rendererUrl('operator')

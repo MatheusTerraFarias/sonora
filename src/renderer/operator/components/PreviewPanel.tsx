@@ -1,5 +1,6 @@
-import type { LiveState, MediaItem, Slide } from '../../../shared/types'
+import type { LiveProgress, LiveState, MediaItem, Slide } from '../../../shared/types'
 import { strings } from '../../shared/strings'
+import { formatTime } from './MediaControls'
 import { SlideThumb } from './SlideThumb'
 import './Operate.css'
 
@@ -11,6 +12,8 @@ export type NextPreview =
 interface Props {
   live: LiveState
   next: NextPreview
+  /** progresso do que está no ar, informado pelo telão */
+  progress?: LiveProgress | null
 }
 
 const KIND_LABEL = { image: strings.media.kindImage, video: strings.media.kindVideo, audio: strings.media.kindAudio } as const
@@ -22,8 +25,9 @@ const OVERLAY_LABEL = {
 } as const
 
 /** Prévia (próximo slide) e Ao vivo (estado atual): miniaturas leves, nunca uma segunda cópia do vídeo. */
-export function PreviewPanel({ live, next }: Props): JSX.Element {
+export function PreviewPanel({ live, next, progress }: Props): JSX.Element {
   const c = live.content
+  const time = progress ? `${formatTime(progress.position)} / ${formatTime(progress.duration)}` : strings.operation.unknownTime
   return (
     <aside className="preview-panel">
       <section>
@@ -48,14 +52,14 @@ export function PreviewPanel({ live, next }: Props): JSX.Element {
             <>
               <div className="preview-box__yt">{KIND_LABEL[c.media.kind]}</div>
               <span className="preview-box__title">
-                {c.media.originalName} · {strings.operation.unknownTime}
+                {c.media.originalName} · {time}
               </span>
             </>
           )}
           {c.type === 'youtube' && (
             <>
               <div className="preview-box__yt">{strings.operation.youtubeItem}</div>
-              <span className="preview-box__title">{strings.operation.unknownTime}</span>
+              <span className="preview-box__title">{time}</span>
             </>
           )}
           {c.type === 'none' && live.overlay === 'none' && <p className="hint">{strings.operation.liveNothing}</p>}
