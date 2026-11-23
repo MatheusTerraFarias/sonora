@@ -42,8 +42,11 @@ async function applyAdblock(enabled: boolean): Promise<void> {
   }
 }
 
-// pasta de dados alternativa (teste de fumaça); só vale quando definida
-if (process.env.SONORA_USER_DATA) app.setPath('userData', process.env.SONORA_USER_DATA)
+// SONORA_USER_DATA: pasta de dados alternativa (teste de fumaça). Vale fora do app instalado;
+// no app instalado só com SONORA_ALLOW_USER_DATA=1, para que uma variável perdida não troque os dados.
+if (process.env.SONORA_USER_DATA && (!app.isPackaged || process.env.SONORA_ALLOW_USER_DATA === '1')) {
+  app.setPath('userData', process.env.SONORA_USER_DATA)
+}
 
 app.whenReady().then(() => {
   let operatorWin: BrowserWindow | null = null
@@ -65,9 +68,6 @@ app.whenReady().then(() => {
   const bundledBible = app.isPackaged ? join(process.resourcesPath, 'bible') : join(app.getAppPath(), 'resources/bible')
   const bible = createBibleStore(join(dir, 'bible'), [bundledBible])
   handle('bible:translations', () => bible.translations())
-  if (process.env.SONORA_LOG_BIBLE) {
-    void Promise.resolve(bible.translations()).then((t) => console.log('[sonora] traduções:', JSON.stringify(t)))
-  }
   handle('bible:importTranslation', async (file?: string) => {
     let path = file
     if (!path) {

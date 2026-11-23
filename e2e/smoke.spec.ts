@@ -1,4 +1,4 @@
-import { _electron as electron, expect, test } from '@playwright/test'
+import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -10,11 +10,12 @@ const shots = join(__dirname, 'screenshots')
 test('cadastra música, monta culto e avança o slide ao vivo', async () => {
   mkdirSync(shots, { recursive: true })
   const userData = mkdtempSync(join(tmpdir(), 'sonora-e2e-'))
-  const app = await electron.launch({
-    args: [join(root, 'out/main/index.js')],
-    env: { ...process.env, SONORA_USER_DATA: userData }
-  })
+  let app: ElectronApplication | undefined
   try {
+    app = await electron.launch({
+      args: [join(root, 'out/main/index.js')],
+      env: { ...process.env, SONORA_USER_DATA: userData }
+    })
     // a primeira janela é a do operador; o telão só abre com um segundo monitor
     const win = await app.firstWindow()
     await win.setViewportSize({ width: 1280, height: 800 })
@@ -55,7 +56,7 @@ test('cadastra música, monta culto e avança o slide ao vivo', async () => {
     await expect.poll(async () => text(await live())).toContain('Segundo verso')
     await win.screenshot({ path: join(shots, '3-operacao.png') })
   } finally {
-    await app.close()
+    await app?.close()
     rmSync(userData, { recursive: true, force: true })
   }
 })
