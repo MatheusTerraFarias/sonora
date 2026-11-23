@@ -1,36 +1,63 @@
 import { useState } from 'react'
-import type { Service } from '../../../shared/types'
 import { strings } from '../../shared/strings'
-import { ErrorBanner, useSafe } from './useSafe'
+import { dayMonth, formatDate, todayIso, weekday } from '../format'
+import type { ServiceSummary } from '../hooks'
+import { Button } from './ui/Button'
+import { Dialog } from './ui/Dialog'
+import { EmptyState, Notice } from './ui/EmptyState'
+import { Field } from './ui/Field'
+import { PanelHeader } from './ui/PanelHeader'
+import { useSafe } from './useSafe'
 
-export type ServiceSummary = Omit<Service, 'items'>
-
-export const todayIso = (): string => {
-  const d = new Date()
-  const p = (n: number): string => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
-export const formatDate = (iso: string): string => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso
-}
+export type { ServiceSummary }
 
 interface Props {
   services: ServiceSummary[]
   currentId: string | null
   onSelect: (id: string) => void
-  /** chamado após criar/duplicar/apagar; recebe o id a selecionar (ou null) */
+  /** chamado após criar; recebe o id a selecionar */
   onChanged: (selectId: string | null) => void | Promise<void>
 }
 
-/** Lista de cultos com criação (nome + data), duplicação e exclusão. */
+function Row({ s, active, onSelect }: { s: ServiceSummary; active: boolean; onSelect: () => void }): JSX.Element {
+  const { day, month } = dayMonth(s.date)
+  return (
+    <li>
+      <button type="button" className={active ? 'row row--active' : 'row'} aria-current={active ? 'true' : undefined} onClick={onSelect}>
+        <span className="date-tile" aria-hidden="true">
+          <span className="date-tile__day tnum">{day}</span>
+          <span className="date-tile__month">{month}</span>
+        </span>
+        <span className="row__text">
+          <span className="row__title">{s.name}</span>
+          <span className="row__meta">
+            <span className="visually-hidden">{formatDate(s.date)} · </span>
+            {weekday(s.date)}
+          </span>
+        </span>
+      </button>
+    </li>
+  )
+}
+
+/** Lista de cultos agrupada por data (próximos / anteriores) + diálogo "Novo culto". */
 export function ServiceList({ services, currentId, onSelect, onChanged }: Props): JSX.Element {
+  const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [date, setDate] = useState(todayIso())
-  const [dupDate, setDupDate] = useState(todayIso())
   const [formError, setFormError] = useState<string | null>(null)
   const safe = useSafe()
+
+  const today = todayIso()
+  const upcoming = services.filter((s) => s.date >= today).sort((a, b) => a.date.localeCompare(b.date))
+  const past = services.filter((s) => s.date < today).sort((a, b) => b.date.localeCompare(a.date))
+
+  const open = (): void => {
+    setName('')
+    setDate(todayIso())
+    setFormError(null)
+    setCreating(true)
+  }
 
   const create = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -39,78 +66,65 @@ export function ServiceList({ services, currentId, onSelect, onChanged }: Props)
     setFormError(null)
     const r = await safe.run(() => window.sonora.services.create(name.trim(), date))
     if (!r.ok) return
-    setName('')
+    setCreating(false)
     await onChanged(r.value.id)
   }
 
-  const duplicate = async (): Promise<void> => {
-    if (!currentId || !dupDate) return
-    const r = await safe.run(() => window.sonora.services.duplicate(currentId, dupDate))
-    if (r.ok) await onChanged(r.value.id)
-  }
-
-  const remove = async (): Promise<void> => {
-    if (!currentId || !window.confirm(strings.services.confirmDelete)) return
-    const r = await safe.run(() => window.sonora.services.remove(currentId))
-    if (r.ok) await onChanged(null)
-  }
-
-  return (
-    <div className="list-pane">
-      <form className="form" onSubmit={create}>
-        <h2 className="pane-title">{strings.services.newTitle}</h2>
-        <label className="form__row">
-          <span>{strings.services.fieldName}</span>
-          <input className="field" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="form__row">
-          <span>{strings.services.fieldDate}</span>
-          <input className="field" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-        {formError && <span className="hint hint--error">{formError}</span>}
-        <div>
-          <button type="submit" className="btn btn--primary">
-            {strings.services.create}
-          </button>
-        </div>
-      </form>
-      <ErrorBanner show={safe.error} />
-      <h2 className="pane-title">{strings.services.listTitle}</h2>
-      {services.length === 0 ? (
-        <p className="hint">{strings.services.empty}</p>
-      ) : (
-        <ul className="list">
-          {services.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                className={s.id === currentId ? 'list__item list__item--active' : 'list__item'}
-                aria-current={s.id === currentId ? 'true' : undefined}
-                onClick={() => onSelect(s.id)}
-              >
-                <span>{s.name}</span>
-                <small>{formatDate(s.date)}</small>
-              </button>
-            </li>
+  const group = (label: string, list: ServiceSummary[]): JSX.Element | null =>
+    list.length === 0 ? null : (
+      <>
+        <p className="group-label">{label}</p>
+        <ul className="rows">
+          {list.map((s) => (
+            <Row key={s.id} s={s} active={s.id === currentId} onSelect={() => onSelect(s.id)} />
           ))}
         </ul>
-      )}
-      {currentId && (
-        <div className="form">
-          <label className="form__row">
-            <span>{strings.services.duplicateDate}</span>
-            <input className="field" type="date" value={dupDate} onChange={(e) => setDupDate(e.target.value)} />
-          </label>
-          <div className="form__actions">
-            <button type="button" className="btn" onClick={duplicate}>
-              {strings.services.duplicate}
-            </button>
-            <button type="button" className="btn btn--danger" onClick={remove}>
-              {strings.services.delete}
-            </button>
+      </>
+    )
+
+  return (
+    <aside className="split__list">
+      <PanelHeader
+        level={1}
+        title={strings.services.title}
+        actions={
+          <Button variant="primary" size="sm" icon="plus" onClick={open}>
+            {strings.services.newTitle}
+          </Button>
+        }
+      />
+      <div className="split__scroll">
+        {services.length === 0 ? (
+          <div className="services__empty">
+            <EmptyState icon="services" title={strings.services.emptyTitle} text={strings.services.emptyHint} compact />
           </div>
-        </div>
-      )}
-    </div>
+        ) : (
+          <>
+            {group(strings.services.upcoming, upcoming)}
+            {group(strings.services.past, past)}
+          </>
+        )}
+      </div>
+
+      <Dialog open={creating} title={strings.services.newTitle} description={strings.services.newDescription} onClose={() => setCreating(false)}>
+        <form className="dialog-form" onSubmit={create}>
+          <Field label={strings.services.fieldName} error={formError === strings.services.nameRequired ? formError : null}>
+            <input className="input" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label={strings.services.fieldDate} error={formError === strings.services.dateRequired ? formError : null}>
+            <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          {safe.error && <Notice tone="error">{strings.common.error}</Notice>}
+          <div className="dialog-form__actions">
+            <Button variant="ghost" onClick={() => setCreating(false)}>
+              {strings.common.cancel}
+            </Button>
+            <Button type="submit" variant="primary" icon="plus">
+              {strings.services.create}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    </aside>
   )
 }

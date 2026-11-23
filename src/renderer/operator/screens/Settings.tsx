@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Background, MediaItem, Settings as SettingsData, TextStyle } from '../../../shared/types'
 import type { DisplayInfo } from '../../../shared/displays'
 import type { TranslationInfo } from '../../../main/bible/bibleStore'
 import { strings } from '../../shared/strings'
 import { MediaThumb } from '../components/MediaThumb'
-import { ErrorBanner, useSafe } from '../components/useSafe'
+import { Button } from '../components/ui/Button'
+import { Notice } from '../components/ui/EmptyState'
+import { Field, Toggle } from '../components/ui/Field'
+import { PanelHeader } from '../components/ui/PanelHeader'
+import { SlideCanvas } from '../components/ui/SlideCanvas'
+import { useSafe } from '../components/useSafe'
 import './Settings.css'
 
 const S = strings.settings
@@ -18,6 +23,22 @@ export function validateStyle(style: Pick<TextStyle, 'maxFontPx' | 'minFontPx'>)
   if (!ok(max) || !ok(min)) return S.fontRange(FONT_MIN, FONT_MAX)
   if (min > max) return S.fontOrder
   return null
+}
+
+type SectionId = 'church' | 'telao' | 'appearance' | 'audio' | 'youtube' | 'backup' | 'about'
+
+function Section({ id, title, help, children }: { id: SectionId; title: string; help?: string; children: React.ReactNode }): JSX.Element {
+  return (
+    <section id={`settings-${id}`} data-section={id} className="settings-section" aria-labelledby={`settings-${id}-title`}>
+      <header className="settings-section__head">
+        <h2 id={`settings-${id}-title`} className="settings-section__title">
+          {title}
+        </h2>
+        {help && <p className="settings-section__help">{help}</p>}
+      </header>
+      <div className="settings-section__body">{children}</div>
+    </section>
+  )
 }
 
 export function Settings(): JSX.Element {
@@ -36,6 +57,8 @@ export function Settings(): JSX.Element {
   const [styleError, setStyleError] = useState<string | null>(null)
   const { error, run } = useSafe()
   const adblockAvailable = window.sonora.youtube.adblockAvailable()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState<SectionId>('church')
 
   const apply = useCallback((s: SettingsData): void => {
     setSettings(s)
@@ -71,12 +94,29 @@ export function Settings(): JSX.Element {
     return r.ok
   }
 
+  // índice lateral: acompanha a seção visível
+  useEffect(() => {
+    const root = scrollRef.current
+    if (!root || !settings) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        const id = top?.target.getAttribute('data-section') as SectionId | null
+        if (id) setActive(id)
+      },
+      { root, rootMargin: '0px 0px -65% 0px' }
+    )
+    root.querySelectorAll('[data-section]').forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [settings])
+
   if (!settings || !background || !style) {
     return (
-      <section className="screen">
-        <h1 className="screen__title">{S.title}</h1>
-        <ErrorBanner show={error} />
-        {!error && <p className="hint">{strings.common.loading}</p>}
+      <section className="workspace settings">
+        <PanelHeader level={1} title={S.title} />
+        <div className="detail__empty">
+          {error ? <Notice tone="error">{strings.common.error}</Notice> : <p className="hint">{strings.common.loading}</p>}
+        </div>
       </section>
     )
   }
@@ -122,242 +162,248 @@ export function Settings(): JSX.Element {
 
   const num = (v: string): number => (v.trim() === '' ? NaN : Number(v))
 
+  const index: { id: SectionId; label: string }[] = [
+    { id: 'church', label: S.churchSection },
+    { id: 'telao', label: S.telaoSection },
+    { id: 'appearance', label: S.appearanceSection },
+    { id: 'audio', label: S.audioSection },
+    ...(adblockAvailable ? [{ id: 'youtube' as const, label: S.youtubeSection }] : []),
+    { id: 'backup', label: S.backupSection },
+    { id: 'about', label: S.aboutSection }
+  ]
+  const jump = (id: SectionId): void => {
+    setActive(id)
+    // rola só a coluna das seções (scrollIntoView rolaria também a moldura do app)
+    const root = scrollRef.current
+    const el = root?.querySelector<HTMLElement>(`#settings-${id}`)
+    if (root && el) root.scrollTo({ top: el.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop })
+  }
+  const isError = message === S.restoreInvalid || message === S.restoreFailed
+  // tamanhos inválidos ainda não salvos: a prévia usa os salvos
+  const previewStyle = validateStyle(style) ? { ...style, minFontPx: settings.style.minFontPx, maxFontPx: settings.style.maxFontPx } : style
+
   return (
-    <section className="screen settings">
-      <h1 className="screen__title">{S.title}</h1>
-      <ErrorBanner show={error} />
-      {message && (
-        <p className="hint" role="status">
-          {message}
-        </p>
-      )}
-
-      <fieldset className="settings__group">
-        <legend>{S.churchSection}</legend>
-        <label className="settings__row">
-          <span>{S.churchName}</span>
-          <input className="field" value={churchName} onChange={(e) => setChurchName(e.target.value)} />
-        </label>
-        <label className="settings__row">
-          <span>{S.logo}</span>
-          <select
-            className="field"
-            value={settings.logoMediaId ?? ''}
-            onChange={(e) => void update({ logoMediaId: e.target.value || null })}
-          >
-            <option value="">{S.noLogo}</option>
-            {images.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.originalName}
-              </option>
+    <section className="workspace settings">
+      <PanelHeader
+        level={1}
+        title={S.title}
+        actions={
+          error || message ? (
+            <>
+              {error && <Notice tone="error">{strings.common.error}</Notice>}
+              {message && <Notice tone={isError ? 'error' : 'ok'}>{message}</Notice>}
+            </>
+          ) : undefined
+        }
+      />
+      <div className="settings__layout">
+        <nav className="settings__index" aria-label={S.indexLabel}>
+          <ul>
+            {index.map((it) => (
+              <li key={it.id}>
+                <button
+                  type="button"
+                  className={it.id === active ? 'settings__index-item settings__index-item--active' : 'settings__index-item'}
+                  aria-current={it.id === active ? 'true' : undefined}
+                  onClick={() => jump(it.id)}
+                >
+                  {it.label}
+                </button>
+              </li>
             ))}
-          </select>
-        </label>
-        <p className="hint">{S.logoHelp}</p>
-        {logo && <MediaThumb media={logo} />}
-        <div>
-          <button type="button" className="btn btn--primary" onClick={saveChurch}>
-            {strings.common.save}
-          </button>
+          </ul>
+        </nav>
+
+        <div className="settings__scroll" ref={scrollRef}>
+          <div className="settings__sections">
+            <Section id="church" title={S.churchSection} help={S.churchHelp}>
+              <Field inline label={S.churchName}>
+                <input className="input" value={churchName} onChange={(e) => setChurchName(e.target.value)} />
+              </Field>
+              <Field inline label={S.logo} hint={S.logoHelp}>
+                <select className="input" value={settings.logoMediaId ?? ''} onChange={(e) => void update({ logoMediaId: e.target.value || null })}>
+                  <option value="">{S.noLogo}</option>
+                  {images.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.originalName}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {logo && (
+                <div className="settings__offset settings__logo">
+                  <MediaThumb media={logo} />
+                </div>
+              )}
+              <div className="settings__offset">
+                <Button variant="primary" onClick={saveChurch}>
+                  {strings.common.save}
+                </Button>
+              </div>
+            </Section>
+
+            <Section id="telao" title={S.telaoSection} help={S.telaoHelp}>
+              <Field inline label={S.displaySection} hint={S.displayHelp}>
+                <span className="settings__control-row">
+                  <select
+                    className="input"
+                    value={settings.projectionDisplayId ?? ''}
+                    onChange={(e) => void update({ projectionDisplayId: e.target.value === '' ? null : Number(e.target.value) })}
+                  >
+                    <option value="">{S.displayAuto}</option>
+                    {displays.map((d) => (
+                      <option key={d.id} value={d.id} disabled={d.isOperator}>
+                        {d.label}
+                        {d.primary ? ` · ${S.displayPrimary}` : ''}
+                        {d.isOperator ? ` · ${S.displayOperator}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <Button icon="monitor" disabled={identifying} onClick={identify}>
+                    {identifying ? S.identifying : S.identify}
+                  </Button>
+                </span>
+              </Field>
+            </Section>
+
+            <Section id="appearance" title={S.appearanceSection} help={S.appearanceHelp}>
+              <div className="settings__appearance">
+                <div className="settings__appearance-fields">
+                  <div className="settings__pair">
+                    <Field label={S.bgType}>
+                      <select
+                        className="input"
+                        value={background.type}
+                        onChange={(e) => setBackground({ ...background, type: e.target.value as Background['type'], mediaId: null })}
+                      >
+                        <option value="color">{S.bgColor}</option>
+                        <option value="image">{S.bgImage}</option>
+                        <option value="video">{S.bgVideo}</option>
+                      </select>
+                    </Field>
+                    {background.type === 'color' ? (
+                      <Field label={S.bgColor}>
+                        <input className="input" type="color" value={background.color} onChange={(e) => setBackground({ ...background, color: e.target.value })} />
+                      </Field>
+                    ) : (
+                      <Field label={S.bgMedia}>
+                        <select className="input" value={background.mediaId ?? ''} onChange={(e) => setBackground({ ...background, mediaId: e.target.value || null })}>
+                          <option value="">{S.bgNoMedia}</option>
+                          {bgOptions.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.originalName}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    )}
+                  </div>
+                  <div className="settings__pair">
+                    <Field label={S.maxFont}>
+                      <input
+                        className="input tnum"
+                        type="number"
+                        min={FONT_MIN}
+                        max={FONT_MAX}
+                        value={Number.isNaN(style.maxFontPx) ? '' : style.maxFontPx}
+                        onChange={(e) => setStyle({ ...style, maxFontPx: num(e.target.value) })}
+                      />
+                    </Field>
+                    <Field label={S.minFont}>
+                      <input
+                        className="input tnum"
+                        type="number"
+                        min={FONT_MIN}
+                        max={FONT_MAX}
+                        value={Number.isNaN(style.minFontPx) ? '' : style.minFontPx}
+                        onChange={(e) => setStyle({ ...style, minFontPx: num(e.target.value) })}
+                      />
+                    </Field>
+                  </div>
+                  <div className="settings__pair">
+                    <Field label={S.textColor}>
+                      <input className="input" type="color" value={style.color} onChange={(e) => setStyle({ ...style, color: e.target.value })} />
+                    </Field>
+                    <Field label={S.align}>
+                      <select className="input" value={style.align} onChange={(e) => setStyle({ ...style, align: e.target.value as TextStyle['align'] })}>
+                        <option value="left">{S.alignLeft}</option>
+                        <option value="center">{S.alignCenter}</option>
+                        <option value="right">{S.alignRight}</option>
+                      </select>
+                    </Field>
+                  </div>
+                  <Toggle label={S.shadow} checked={style.shadow} onChange={(v) => setStyle({ ...style, shadow: v })} />
+                  {styleError && <Notice tone="error">{styleError}</Notice>}
+                  <div>
+                    <Button variant="primary" onClick={saveStyle}>
+                      {strings.common.save}
+                    </Button>
+                  </div>
+                </div>
+                <figure className="settings__preview">
+                  <SlideCanvas slide={{ label: '', text: S.previewSample }} background={background} style={previewStyle} />
+                  <figcaption className="hint">{S.previewLabel}</figcaption>
+                </figure>
+              </div>
+            </Section>
+
+            <Section id="audio" title={S.audioSection} help={S.audioHelpSection}>
+              <Field inline label={S.audioDevice} hint={S.audioHelp}>
+                <select className="input" value={settings.audioOutputDeviceId ?? ''} onChange={(e) => void update({ audioOutputDeviceId: e.target.value || null })}>
+                  <option value="">{S.audioDefault}</option>
+                  {audioDevices
+                    .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
+                    .map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || S.audioUnnamed}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            </Section>
+
+            {adblockAvailable && (
+              <Section id="youtube" title={S.youtubeSection} help={S.adblockSection}>
+                <Toggle label={S.adblock} hint={S.adblockWarning} checked={settings.adblockEnabled} onChange={(v) => void update({ adblockEnabled: v })} />
+              </Section>
+            )}
+
+            <Section id="backup" title={S.backupSection} help={S.backupHelpSection}>
+              <p className="settings__text">{S.backupHelp}</p>
+              <div className="inline-actions">
+                <Button icon="download" disabled={busy !== null} onClick={exportBackup}>
+                  {busy === 'export' ? S.exporting : S.export}
+                </Button>
+                <Button variant="danger" icon="restore" disabled={busy !== null} onClick={restoreBackup}>
+                  {S.restore}
+                </Button>
+              </div>
+            </Section>
+
+            <Section id="about" title={S.aboutSection} help={S.aboutHelp}>
+              <dl className="settings__facts">
+                <dt>{S.version}</dt>
+                <dd className="tnum">
+                  {strings.app.name} {version}
+                </dd>
+              </dl>
+              <Toggle label={S.updates} hint={S.updatesHelp} checked={settings.updatesEnabled} onChange={(v) => void update({ updatesEnabled: v })} />
+              <div>
+                <h3 className="section-title">{S.bibleLicenses}</h3>
+                {translations.length === 0 && <p className="hint">{S.noTranslations}</p>}
+                <ul className="settings__licenses">
+                  {translations.map((t) => (
+                    <li key={t.id}>
+                      <strong>{t.name}</strong>
+                      <span className="hint">{t.license}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Section>
+          </div>
         </div>
-      </fieldset>
-
-      <fieldset className="settings__group">
-        <legend>{S.displaySection}</legend>
-        <div className="toolbar">
-          <select
-            className="field"
-            aria-label={S.displaySection}
-            value={settings.projectionDisplayId ?? ''}
-            onChange={(e) => void update({ projectionDisplayId: e.target.value === '' ? null : Number(e.target.value) })}
-          >
-            <option value="">{S.displayAuto}</option>
-            {displays.map((d) => (
-              <option key={d.id} value={d.id} disabled={d.isOperator}>
-                {d.label}
-                {d.primary ? ` · ${S.displayPrimary}` : ''}
-                {d.isOperator ? ` · ${S.displayOperator}` : ''}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="btn" disabled={identifying} onClick={identify}>
-            {identifying ? S.identifying : S.identify}
-          </button>
-        </div>
-        <p className="hint">{S.displayHelp}</p>
-      </fieldset>
-
-      <fieldset className="settings__group">
-        <legend>{S.styleSection}</legend>
-        <label className="settings__row">
-          <span>{S.bgType}</span>
-          <select
-            className="field"
-            value={background.type}
-            onChange={(e) => setBackground({ ...background, type: e.target.value as Background['type'], mediaId: null })}
-          >
-            <option value="color">{S.bgColor}</option>
-            <option value="image">{S.bgImage}</option>
-            <option value="video">{S.bgVideo}</option>
-          </select>
-        </label>
-        {background.type === 'color' ? (
-          <label className="settings__row">
-            <span>{S.bgColor}</span>
-            <input
-              type="color"
-              value={background.color}
-              onChange={(e) => setBackground({ ...background, color: e.target.value })}
-            />
-          </label>
-        ) : (
-          <label className="settings__row">
-            <span>{S.bgMedia}</span>
-            <select
-              className="field"
-              value={background.mediaId ?? ''}
-              onChange={(e) => setBackground({ ...background, mediaId: e.target.value || null })}
-            >
-              <option value="">{S.bgNoMedia}</option>
-              {bgOptions.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.originalName}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="settings__row">
-          <span>{S.maxFont}</span>
-          <input
-            className="field"
-            type="number"
-            min={FONT_MIN}
-            max={FONT_MAX}
-            value={Number.isNaN(style.maxFontPx) ? '' : style.maxFontPx}
-            onChange={(e) => setStyle({ ...style, maxFontPx: num(e.target.value) })}
-          />
-        </label>
-        <label className="settings__row">
-          <span>{S.minFont}</span>
-          <input
-            className="field"
-            type="number"
-            min={FONT_MIN}
-            max={FONT_MAX}
-            value={Number.isNaN(style.minFontPx) ? '' : style.minFontPx}
-            onChange={(e) => setStyle({ ...style, minFontPx: num(e.target.value) })}
-          />
-        </label>
-        <label className="settings__row">
-          <span>{S.textColor}</span>
-          <input type="color" value={style.color} onChange={(e) => setStyle({ ...style, color: e.target.value })} />
-        </label>
-        <label className="settings__row settings__row--check">
-          <input type="checkbox" checked={style.shadow} onChange={(e) => setStyle({ ...style, shadow: e.target.checked })} />
-          <span>{S.shadow}</span>
-        </label>
-        <label className="settings__row">
-          <span>{S.align}</span>
-          <select
-            className="field"
-            value={style.align}
-            onChange={(e) => setStyle({ ...style, align: e.target.value as TextStyle['align'] })}
-          >
-            <option value="left">{S.alignLeft}</option>
-            <option value="center">{S.alignCenter}</option>
-            <option value="right">{S.alignRight}</option>
-          </select>
-        </label>
-        {styleError && (
-          <p className="hint hint--error" role="alert">
-            {styleError}
-          </p>
-        )}
-        <div>
-          <button type="button" className="btn btn--primary" onClick={saveStyle}>
-            {strings.common.save}
-          </button>
-        </div>
-      </fieldset>
-
-      <fieldset className="settings__group">
-        <legend>{S.audioSection}</legend>
-        <select
-          className="field"
-          aria-label={S.audioSection}
-          value={settings.audioOutputDeviceId ?? ''}
-          onChange={(e) => void update({ audioOutputDeviceId: e.target.value || null })}
-        >
-          <option value="">{S.audioDefault}</option>
-          {audioDevices
-            .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
-            .map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || S.audioUnnamed}
-              </option>
-            ))}
-        </select>
-        <p className="hint">{S.audioHelp}</p>
-      </fieldset>
-
-      {adblockAvailable && (
-        <fieldset className="settings__group">
-          <legend>{S.adblockSection}</legend>
-          <label className="settings__row settings__row--check">
-            <input
-              type="checkbox"
-              checked={settings.adblockEnabled}
-              onChange={(e) => void update({ adblockEnabled: e.target.checked })}
-            />
-            <span>{S.adblock}</span>
-          </label>
-          <p className="hint">{S.adblockWarning}</p>
-        </fieldset>
-      )}
-
-      <fieldset className="settings__group">
-        <legend>{S.updatesSection}</legend>
-        <label className="settings__row settings__row--check">
-          <input
-            type="checkbox"
-            checked={settings.updatesEnabled}
-            onChange={(e) => void update({ updatesEnabled: e.target.checked })}
-          />
-          <span>{S.updates}</span>
-        </label>
-        <p className="hint">{S.updatesHelp}</p>
-      </fieldset>
-
-      <fieldset className="settings__group">
-        <legend>{S.backupSection}</legend>
-        <p className="hint">{S.backupHelp}</p>
-        <div className="toolbar">
-          <button type="button" className="btn" disabled={busy !== null} onClick={exportBackup}>
-            {busy === 'export' ? S.exporting : S.export}
-          </button>
-          <button type="button" className="btn btn--danger" disabled={busy !== null} onClick={restoreBackup}>
-            {S.restore}
-          </button>
-        </div>
-      </fieldset>
-
-      <fieldset className="settings__group">
-        <legend>{S.aboutSection}</legend>
-        <p>
-          {strings.app.name} · {S.version} {version}
-        </p>
-        <h2 className="settings__sub">{S.bibleLicenses}</h2>
-        {translations.length === 0 && <p className="hint">{S.noTranslations}</p>}
-        <ul className="settings__licenses">
-          {translations.map((t) => (
-            <li key={t.id}>
-              <strong>{t.name}</strong>
-              <span className="hint">{t.license}</span>
-            </li>
-          ))}
-        </ul>
-      </fieldset>
+      </div>
     </section>
   )
 }

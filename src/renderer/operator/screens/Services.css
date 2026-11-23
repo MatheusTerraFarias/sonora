@@ -1,0 +1,156 @@
+.services__empty {
+  padding: 0 var(--s-3);
+}
+
+/* bloco de data na lista de cultos */
+.date-tile {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-control);
+  background: var(--cabine);
+  line-height: 1.05;
+}
+.date-tile__day {
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+.date-tile__month {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.row--active .date-tile {
+  background: var(--blue);
+}
+.row--active .date-tile__month {
+  color: var(--text);
+}
+
+.services__body {
+  max-width: 860px;
+}
+.services__script-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-3);
+}
+.services__script-head .section-title {
+  margin: 0;
+}
+
+/* roteiro do culto */
+.script {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+.script-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 56px;
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-1);
+  border-bottom: 1px solid var(--line);
+  background: var(--cabine);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition: background-color var(--t-fast) var(--ease);
+}
+.script-item:hover {
+  background: var(--navy);
+}
+.script-item:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+.script-item--dragging {
+  position: relative;
+  z-index: 1;
+  background: var(--royal);
+  border-radius: var(--r-control);
+  cursor: grabbing;
+}
+.script-item__grip {
+  color: var(--text-2);
+  opacity: 0.6;
+}
+.script-item:hover .script-item__grip {
+  opacity: 1;
+}
+.script-item__num {
+  width: 20px;
+  text-align: right;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.script-item__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--r-control);
+  background: var(--navy);
+  color: var(--text-2);
+}
+.script-item__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.script-item__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.script-item__kind {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.script-item .btn--danger {
+  color: var(--text-2);
+}
+.script-item .btn--danger:hover:not(:disabled) {
+  color: var(--alerta);
+}
+.script-item__live {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 0 3px rgba(25, 185, 154, 0.25);
+}
+.script-item--live .script-item__icon {
+  color: var(--mint);
+}
+.script-item__actions {
+  display: flex;
+  gap: var(--s-1);
+  opacity: 0.75;
+}
+.script-item:hover .script-item__actions,
+.script-item:focus-within .script-item__actions {
+  opacity: 1;
+}
+.script-item--missing .script-item__title {
+  text-decoration: line-through;
+  color: var(--text-2);
+  font-weight: 400;
+}
+.script-item--missing .script-item__icon {
+  opacity: 0.5;
+}

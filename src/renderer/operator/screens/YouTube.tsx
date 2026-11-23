@@ -5,7 +5,11 @@ import { parseVideoId, watchUrl, YOUTUBE_PARTITION } from '../../../shared/youtu
 import { strings } from '../../shared/strings'
 import type { WebviewElement } from '../../shared/webview'
 import { AddToServiceButton } from '../components/AddToServiceButton'
-import { ErrorBanner, useSafe } from '../components/useSafe'
+import { Button } from '../components/ui/Button'
+import { EmptyState, Notice } from '../components/ui/EmptyState'
+import { Icon } from '../components/ui/Icon'
+import { PanelHeader } from '../components/ui/PanelHeader'
+import { useSafe } from '../components/useSafe'
 import { useOperatorStore } from '../store'
 import './YouTube.css'
 
@@ -112,36 +116,51 @@ export function YouTube(): JSX.Element {
     void webviewRef.current?.loadURL(target).catch(() => undefined)
   }
 
+  const status = !online
+    ? strings.youtube.offline
+    : !videoId
+      ? strings.youtube.noVideo
+      : lookup.status === 'loading'
+        ? strings.youtube.checking
+        : lookup.status === 'notfound'
+          ? strings.youtube.notFound
+          : title
+
   return (
     <section className="youtube">
       <div className="youtube__main">
-        <div className="toolbar youtube__toolbar">
-          <button type="button" className="btn" disabled={!nav.back} onClick={() => webviewRef.current?.goBack()}>
-            {strings.youtube.back}
-          </button>
-          <button type="button" className="btn" disabled={!nav.forward} onClick={() => webviewRef.current?.goForward()}>
-            {strings.youtube.forward}
-          </button>
-          <button type="button" className="btn" onClick={() => open(HOME)}>
-            {strings.youtube.home}
-          </button>
-          <AddToServiceButton data={online ? itemData : null} />
-          <button type="button" className="btn" disabled={!current || isFavorite} onClick={() => void favorite()}>
-            {isFavorite ? strings.youtube.favorited : strings.youtube.favorite}
-          </button>
-          <ErrorBanner show={error} />
+        <div className="youtube__toolbar">
+          <div className="youtube__nav">
+            <Button variant="ghost" icon="arrowLeft" iconOnly disabled={!nav.back} onClick={() => webviewRef.current?.goBack()}>
+              {strings.youtube.back}
+            </Button>
+            <Button variant="ghost" icon="arrowRight" iconOnly disabled={!nav.forward} onClick={() => webviewRef.current?.goForward()}>
+              {strings.youtube.forward}
+            </Button>
+            <Button variant="ghost" icon="home" iconOnly onClick={() => open(HOME)}>
+              {strings.youtube.home}
+            </Button>
+          </div>
+          <p
+            className={!online || lookup.status === 'notfound' ? 'youtube__status youtube__status--warn' : 'youtube__status'}
+            aria-live="polite"
+            aria-label={strings.youtube.addressLabel}
+          >
+            <Icon name={!online ? 'wifiOff' : current ? 'youtube' : 'link'} size={16} />
+            <span className="youtube__status-text">{status}</span>
+          </p>
+          <div className="youtube__actions">
+            <Button icon="star" disabled={!current || isFavorite} onClick={() => void favorite()}>
+              {isFavorite ? strings.youtube.favorited : strings.youtube.favorite}
+            </Button>
+            <AddToServiceButton data={online ? itemData : null} />
+          </div>
         </div>
-        <p className="hint youtube__status" aria-live="polite">
-          {!online
-            ? strings.youtube.offline
-            : !videoId
-              ? strings.youtube.noVideo
-              : lookup.status === 'loading'
-                ? strings.youtube.checking
-                : lookup.status === 'notfound'
-                  ? strings.youtube.notFound
-                  : title}
-        </p>
+        {error && (
+          <div className="youtube__error">
+            <Notice tone="error">{strings.common.error}</Notice>
+          </div>
+        )}
         <webview
           ref={webviewRef as React.Ref<HTMLWebViewElement>}
           className="youtube__webview"
@@ -151,30 +170,33 @@ export function YouTube(): JSX.Element {
         />
       </div>
       <aside className="youtube__favorites">
-        <h2 className="pane-title">{strings.youtube.favorites}</h2>
-        {favorites.length === 0 && <p className="hint">{strings.youtube.noFavorites}</p>}
-        <ul className="youtube__fav-list">
-          {favorites.map((f) => (
-            <li key={f.videoId} className="youtube__fav">
-              {f.thumbnail ? <img className="youtube__thumb" src={f.thumbnail} alt="" draggable={false} /> : null}
-              <span className="youtube__fav-title" title={f.title}>
-                {f.title || strings.youtube.untitled}
-              </span>
-              {f.channel ? <small className="hint">{f.channel}</small> : null}
-              <div className="youtube__fav-actions">
-                <button type="button" className="btn" onClick={() => open(watchUrl(f.videoId))}>
-                  {strings.youtube.open}
+        <PanelHeader title={strings.youtube.favorites} />
+        <div className="youtube__fav-scroll">
+          {favorites.length === 0 && <EmptyState icon="star" title={strings.youtube.noFavorites} compact />}
+          <ul className="youtube__fav-list">
+            {favorites.map((f) => (
+              <li key={f.videoId} className="youtube__fav">
+                <button type="button" className="youtube__fav-open" onClick={() => open(watchUrl(f.videoId))} title={strings.youtube.open}>
+                  {f.thumbnail ? <img className="youtube__thumb" src={f.thumbnail} alt="" draggable={false} /> : <span className="youtube__thumb" />}
+                  <span className="youtube__fav-text">
+                    <span className="youtube__fav-title">{f.title || strings.youtube.untitled}</span>
+                    {f.channel ? <span className="youtube__fav-channel">{f.channel}</span> : null}
+                  </span>
                 </button>
-                <AddToServiceButton
-                  data={{ kind: 'youtube', videoId: f.videoId, title: f.title || strings.youtube.untitled, thumbnail: f.thumbnail }}
-                />
-                <button type="button" className="btn btn--danger" onClick={() => void removeFavorite(f.videoId)}>
-                  {strings.youtube.removeFavorite}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                <div className="youtube__fav-actions">
+                  <AddToServiceButton
+                    variant="secondary"
+                    size="sm"
+                    data={{ kind: 'youtube', videoId: f.videoId, title: f.title || strings.youtube.untitled, thumbnail: f.thumbnail }}
+                  />
+                  <Button variant="danger" size="sm" icon="trash" iconOnly onClick={() => void removeFavorite(f.videoId)}>
+                    {strings.youtube.removeFavorite}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </aside>
     </section>
   )
