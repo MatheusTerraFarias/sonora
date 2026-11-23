@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isYoutubeUrl, parseVideoId, youtubeGate } from '../../src/shared/youtube'
+import { guestMayNavigate, isYoutubeUrl, parseVideoId, youtubeGate } from '../../src/shared/youtube'
 
 describe('parseVideoId', () => {
   const id = 'dQw4w9WgXcQ'
@@ -70,5 +70,37 @@ describe('isYoutubeUrl', () => {
     expect(isYoutubeUrl('https://evil.com/?https://www.youtube.com/')).toBe(false)
     expect(isYoutubeUrl('file:///c:/x')).toBe(false)
     expect(isYoutubeUrl('lixo')).toBe(false)
+  })
+})
+
+describe('guestMayNavigate', () => {
+  it('aceita só hosts exatos do YouTube e do login do Google, em https', () => {
+    for (const u of [
+      'https://www.youtube.com/watch?v=x',
+      'https://youtube.com/',
+      'https://m.youtube.com/',
+      'https://accounts.google.com/ServiceLogin',
+      'https://accounts.youtube.com/accounts/SetSID',
+      'https://consent.youtube.com/m',
+      'https://consent.google.com/',
+      'https://accounts.google.com.br/',
+      'https://accounts.google.pt/'
+    ])
+      expect(guestMayNavigate(u), u).toBe(true)
+  })
+  it('recusa hosts parecidos, conteúdo de usuários e http', () => {
+    for (const u of [
+      'https://accounts.google.evil.com/',
+      'https://accounts.google.co.de/',
+      'https://sites.google.com/view/x',
+      'https://youtube.com.evil.com/',
+      'https://evil.com/youtube.com',
+      'https://evil.com/?u=https://www.youtube.com/',
+      'https://music.youtube.com/',
+      'http://www.youtube.com/',
+      'javascript:alert(1)',
+      'lixo'
+    ])
+      expect(guestMayNavigate(u), u).toBe(false)
   })
 })

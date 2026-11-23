@@ -1,5 +1,5 @@
 import { app, net, shell, type WebContents } from 'electron'
-import { isYoutubeUrl, parseVideoId, thumbnailUrl, YOUTUBE_PARTITION } from '../../shared/youtube'
+import { guestMayNavigate, isYoutubeUrl, parseVideoId, thumbnailUrl, YOUTUBE_PARTITION } from '../../shared/youtube'
 
 /** abre no navegador do sistema, só links http(s) */
 export function openExternalSafe(url: string): void {
@@ -10,19 +10,6 @@ export function openExternalSafe(url: string): void {
     return
   }
   if (u.protocol === 'http:' || u.protocol === 'https:') void shell.openExternal(u.toString()).catch(() => undefined)
-}
-
-/** para onde a webview do YouTube pode navegar: o YouTube e o login do Google (Premium) */
-function guestMayNavigate(url: string): boolean {
-  let u: URL
-  try {
-    u = new URL(url)
-  } catch {
-    return false
-  }
-  if (u.protocol !== 'https:') return false
-  const h = u.hostname.toLowerCase()
-  return h === 'youtube.com' || h.endsWith('.youtube.com') || h === 'google.com' || h.endsWith('.google.com') || /^accounts\.google\.[a-z.]+$/.test(h)
 }
 
 /**
@@ -43,6 +30,8 @@ export function hardenWebviews(opensLinks: (embedder: WebContents) => boolean): 
       webPreferences.nodeIntegrationInSubFrames = false
       webPreferences.contextIsolation = true
       webPreferences.sandbox = true
+      // a página do YouTube nunca hospeda outra webview
+      webPreferences.webviewTag = false
       webPreferences.webSecurity = true
       webPreferences.allowRunningInsecureContent = false
       webPreferences.autoplayPolicy = 'no-user-gesture-required'
@@ -55,10 +44,16 @@ export function hardenWebviews(opensLinks: (embedder: WebContents) => boolean): 
         if (external) openExternalSafe(url)
         return { action: 'deny' }
       })
-      guest.on('will-navigate', (event, url) => {
-        if (guestMayNavigate(url)) return
+      guest.on('will-navigate', (event) => {
+        if (guestMayNavigate(event.url)) return
         event.preventDefault()
-        if (external) openExternalSafe(url)
+        if (external) openExternalSafe(event.url)
+      })
+      // redirecionamentos HTTP do quadro principal seguem a mesma regra (iframes podem ser de outra origem)
+      guest.on('will-redirect', (event) => {
+        if (!event.isMainFrame || guestMayNavigate(event.url)) return
+        event.preventDefault()
+        if (external) openExternalSafe(event.url)
       })
     })
   })

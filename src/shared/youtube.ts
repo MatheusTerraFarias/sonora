@@ -74,3 +74,30 @@ export function youtubeGate(sample: PlayerSample, prev: GateState = 'hidden'): G
   if (!sample.paused) return 'visible'
   return prev === 'visible' ? 'visible' : 'hidden'
 }
+
+/**
+ * Hosts por onde a webview do YouTube pode navegar (quadro principal, inclusive redirecionamentos):
+ * o YouTube e o login do Google para o Premium. Lista exata: nada de sufixos (sites.google.com é
+ * conteúdo de usuários) nem padrões de domínio de país abertos.
+ */
+const GUEST_HOSTS = new Set([
+  'www.youtube.com',
+  'youtube.com',
+  'm.youtube.com',
+  'accounts.youtube.com',
+  'consent.youtube.com',
+  'accounts.google.com',
+  'consent.google.com',
+  'accounts.google.com.br',
+  'accounts.google.pt'
+])
+
+export function guestMayNavigate(url: string): boolean {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return false
+  }
+  return u.protocol === 'https:' && u.port === '' && GUEST_HOSTS.has(u.hostname.toLowerCase())
+}

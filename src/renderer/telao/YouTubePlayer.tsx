@@ -14,6 +14,7 @@ import type { WebviewElement } from '../shared/webview'
 type YoutubeContent = Extract<LiveContent, { type: 'youtube' }>
 
 const TICK_MS = 250
+const TICK_VISIBLE_MS = 100
 const FADE_MS = 300
 
 /** Esconde tudo menos o <video>, em tela cheia (sem título, logo, telas de fim ou da página de watch). */
@@ -43,8 +44,9 @@ type Sample = PlayerSample & { found: boolean; duration: number; seeked: boolean
  * Lê o estado do <video> da página e aplica play/pausa/volume/posição — pela API do player da
  * página (playVideo/pauseVideo/seekTo/mute/setVolume) quando existe, senão no próprio <video>
  * (mexer só no elemento faz a página de watch pausar de novo).
- * Erro: o evento onError do player ou, sem ele, o texto "Erro NNN"/"Error NNN" da tela de
- * erro do player; tela de erro sem código é tratada como 150 (incorporação proibida).
+ * Erro: o evento onError do player ou, sem ele, o texto "Erro NNN"/"Error NNN" de dentro da
+ * tela de erro do player (nunca do player inteiro, que inclui o título); tela de erro
+ * visível sem código é tratada como 150 (incorporação proibida).
  * Mudo durante anúncio e enquanto não há play pedido (o autoplay não vaza som); posição só fora de anúncio.
  */
 const tickScript = (want: Want): string => `(() => {
@@ -57,10 +59,15 @@ const tickScript = (want: Want): string => `(() => {
     } catch (_) {}
   }
   let errorCode = typeof window.__sonoraErr === 'number' ? window.__sonoraErr : null;
-  if (errorCode === null && p) {
-    const m = /(?:Erro|Error)\\s+(\\d{3})\\b/.exec(p.textContent || '');
-    if (m) errorCode = Number(m[1]);
-    else if (p.querySelector('.ytp-error, [class*="ErrorScreen"]')) errorCode = 150;
+  if (errorCode === null) {
+    // só a tela de erro do player (o título do vídeo pode conter "Error 404"); no embed ela
+    // fica fora de #movie_player, por isso a busca é no documento, mas só nesses seletores
+    const screens = [...document.querySelectorAll('.ytp-error, yt-player-error-message-renderer, yt-interstitial-view-model, [class*="ErrorScreen"]')]
+      .filter((el) => el.getClientRects().length > 0);
+    if (screens.length > 0) {
+      const m = /(?:Erro|Error)\\s+(\\d{3})\\b/.exec(screens.map((el) => el.textContent || '').join(' '));
+      errorCode = m ? Number(m[1]) : 150;
+    }
   }
   const api = !!(p && typeof p.playVideo === 'function' && typeof p.getPlayerState === 'function');
   const state = api ? p.getPlayerState() : null;
@@ -131,17 +138,29 @@ export function YouTubePlayer({ content }: { content: YoutubeContent }): JSX.Ele
     }
   }, [mode])
 
-  // portão + comandos + progresso
+  // portão + comandos + progresso: a cada 250 ms escondido, 100 ms visível (anúncio no meio some rápido)
   useEffect(() => {
-    let busy = false
-    const timer = setInterval(() => {
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let lastReport = 0
+    const schedule = (): void => {
+      if (!stopped) timer = setTimeout(tick, gateRef.current === 'visible' ? TICK_VISIBLE_MS : TICK_MS)
+    }
+    /** esconder é instantâneo: sem esperar o React nem a transição */
+    const hideNow = (): void => {
+      const el = ref.current
+      if (el) {
+        el.style.transition = 'none'
+        el.style.opacity = '0'
+      }
+    }
+    const tick = (): void => {
       const wv = ref.current
-      if (!wv || !ready.current || busy) return
-      busy = true
+      if (!wv || !ready.current) return schedule()
       wv.executeJavaScript(tickScript(want.current))
         .then((raw) => {
           const s = raw as Sample | null
-          if (!s) return
+          if (!s || stopped) return
           if (s.seeked) want.current.seekTo = null
           const sample: PlayerSample = {
             currentTime: s.currentTime,
@@ -151,6 +170,7 @@ export function YouTubePlayer({ content }: { content: YoutubeContent }): JSX.Ele
             errorCode: mode === 'watch' ? null : s.errorCode
           }
           const next = s.found || sample.errorCode !== null ? youtubeGate(sample, gateRef.current) : 'hidden'
+          if (next !== 'visible') hideNow()
           if (next === 'fallback') {
             ready.current = false
             gateRef.current = 'hidden'
@@ -162,16 +182,20 @@ export function YouTubePlayer({ content }: { content: YoutubeContent }): JSX.Ele
             gateRef.current = next
             setGate(next)
           }
-          if (s.found && !s.adShowing && Number.isFinite(s.duration) && s.duration > 0) {
+          const now = performance.now()
+          if (s.found && !s.adShowing && Number.isFinite(s.duration) && s.duration > 0 && now - lastReport >= TICK_MS) {
+            lastReport = now
             window.sonora.live.reportProgress({ key: videoId, position: s.currentTime, duration: s.duration })
           }
         })
         .catch(() => undefined)
-        .finally(() => {
-          busy = false
-        })
-    }, TICK_MS)
-    return () => clearInterval(timer)
+        .finally(schedule)
+    }
+    schedule()
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+    }
   }, [mode, videoId])
 
   return (
@@ -188,7 +212,8 @@ export function YouTubePlayer({ content }: { content: YoutubeContent }): JSX.Ele
         display: 'flex',
         pointerEvents: 'none',
         opacity: gate === 'visible' ? 1 : 0,
-        transition: `opacity ${FADE_MS}ms ease`
+        // só o aparecer tem fade; sumir (anúncio) é imediato
+        transition: gate === 'visible' ? `opacity ${FADE_MS}ms ease` : 'none'
       }}
     />
   )
