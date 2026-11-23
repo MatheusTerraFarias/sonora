@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ID, LiveState, MediaItem, MediaKind, Overlay, ResolvedItem, Service, ServiceItem, ServiceItemData, Settings, Song } from '../shared/types'
+import type { ID, LiveState, Slide, MediaItem, MediaKind, Overlay, ResolvedItem, Service, ServiceItem, ServiceItemData, Settings, Song } from '../shared/types'
 import type { SongInput } from '../main/repos/songs'
 import type { TranslationInfo } from '../main/bible/bibleStore'
 import type { YoutubeFavorite } from '../main/repos/favorites'
@@ -88,11 +88,15 @@ export const api = {
     media: call('live:media') as (cmd: { play?: boolean; volume?: number; position?: number }) => Promise<void>,
     /** chamar de novo sempre que o culto for alterado */
     loadService: call('live:loadService') as (serviceId: ID) => Promise<void>,
+    /** itens do culto carregado, com slides e `skip` */
+    outline: call('live:outline') as () => Promise<{ itemId: ID; skip: boolean; slides: Slide[] }[]>,
     setOnline: call('live:setOnline') as (online: boolean) => Promise<void>,
     onState: (cb: (s: LiveState) => void): (() => void) => on('live:state', cb)
   },
   displays: {
-    list: call('displays:list') as () => Promise<DisplayInfo[]>
+    list: call('displays:list') as () => Promise<DisplayInfo[]>,
+    /** recebe a lista completa quando monitores mudam; retorna o cancelamento */
+    onChange: (cb: (d: DisplayInfo[]) => void): (() => void) => on('displays:changed', cb)
   },
   on
 }

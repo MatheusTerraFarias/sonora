@@ -14,13 +14,15 @@ interface Props {
   onSubmit: (data: NoticeData) => boolean | Promise<boolean>
   submitLabel?: string
   disabled?: boolean
+  /** edição: preenche o formulário e não o limpa ao salvar */
+  initial?: NoticeData
 }
 
 /** Formulário reutilizável de aviso: título, corpo e fundo opcional (da biblioteca de mídias). */
-export function NoticeForm({ onSubmit, submitLabel = strings.notices.submit, disabled }: Props): JSX.Element {
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [bg, setBg] = useState('')
+export function NoticeForm({ onSubmit, submitLabel = strings.notices.submit, disabled, initial }: Props): JSX.Element {
+  const [title, setTitle] = useState(initial?.title ?? '')
+  const [body, setBody] = useState(initial?.body ?? '')
+  const [bg, setBg] = useState(initial?.backgroundMediaId ?? '')
   const [media, setMedia] = useState<MediaItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const safe = useSafe()
@@ -40,7 +42,7 @@ export function NoticeForm({ onSubmit, submitLabel = strings.notices.submit, dis
     }
     setError(null)
     const ok = await onSubmit({ title: title.trim(), body, backgroundMediaId: bg || null })
-    if (!ok) return
+    if (!ok || initial) return
     setTitle('')
     setBody('')
     setBg('')

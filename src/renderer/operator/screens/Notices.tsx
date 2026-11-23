@@ -12,6 +12,7 @@ export function Notices(): JSX.Element {
     if (!serviceId) return false
     try {
       await window.sonora.services.addItem(serviceId, { kind: 'notice', ...data })
+      await window.sonora.live.loadService(serviceId)
       setMessage(strings.notices.added)
       return true
     } catch {

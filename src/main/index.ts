@@ -118,6 +118,7 @@ app.whenReady().then(() => {
   handle('live:setOverlay', (o: Overlay) => live.setOverlay(o))
   handle('live:media', (cmd: { play?: boolean; volume?: number; position?: number }) => live.media(cmd))
   handle('live:loadService', (serviceId: string) => live.loadService(serviceId))
+  handle('live:outline', () => live.outline())
   handle('live:setOnline', (online: boolean) => live.setOnline(online))
   const operatorWin = createOperatorWindow()
   operatorWin.on('closed', () => app.quit())
@@ -133,7 +134,7 @@ app.whenReady().then(() => {
         if (!win.isDestroyed()) win.webContents.send('live:state', live.get())
       })
   })
-  handle('displays:list', (): DisplayInfo[] => {
+  const listDisplays = (): DisplayInfo[] => {
     const opId = operatorDisplayId()
     return screen.getAllDisplays().map((d, i) => ({
       id: d.id,
@@ -141,19 +142,25 @@ app.whenReady().then(() => {
       primary: d.id === primaryId(),
       isOperator: d.id === opId
     }))
-  })
+  }
+  handle('displays:list', listDisplays)
+  /** sincroniza o telão e avisa o operador da nova lista de monitores */
+  const syncProjection = (): void => {
+    projection.sync()
+    broadcast('displays:changed', listDisplays())
+  }
   let lastSaved = settings.get().projectionDisplayId
   settings.onChange((s) => {
     if (s.projectionDisplayId !== lastSaved) {
       lastSaved = s.projectionDisplayId
-      projection.sync()
+      syncProjection()
     }
   })
-  screen.on('display-added', () => projection.sync())
-  screen.on('display-removed', () => projection.sync())
-  screen.on('display-metrics-changed', () => projection.sync())
-  operatorWin.on('moved', () => projection.sync())
-  projection.sync()
+  screen.on('display-added', () => syncProjection())
+  screen.on('display-removed', () => syncProjection())
+  screen.on('display-metrics-changed', () => syncProjection())
+  operatorWin.on('moved', () => syncProjection())
+  syncProjection()
   app.on('before-quit', () => projection.destroy())
 })
 

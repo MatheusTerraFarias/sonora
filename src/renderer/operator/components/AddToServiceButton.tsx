@@ -26,6 +26,7 @@ export function AddToServiceButton({ data, label = strings.addToService.button, 
     setState('busy')
     try {
       await window.sonora.services.addItem(serviceId, data)
+      await window.sonora.live.loadService(serviceId)
       setState('done')
       onAdded?.()
     } catch {

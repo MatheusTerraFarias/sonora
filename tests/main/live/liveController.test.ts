@@ -137,3 +137,12 @@ test('subscribe recebe mudanças', () => {
   live.goTo('i0', 0)
   expect(f).toHaveBeenCalledOnce()
 })
+
+test('outline lista itens com slides e skip', () => {
+  const { live } = setup()
+  const o = live.outline()
+  expect(o.map((e) => e.itemId)).toEqual(['i0', 'i1', 'i2', 'i3', 'i4'])
+  expect(o[0].slides.map((x) => x.text)).toEqual(['a', 'b'])
+  expect(o[1].skip).toBe(true)
+  expect(o[2].slides).toEqual([])
+})

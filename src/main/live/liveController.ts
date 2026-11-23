@@ -67,6 +67,11 @@ export class LiveController {
     })
   }
 
+  /** itens do culto carregado com seus slides (para a grade e a prévia do operador) */
+  outline(): { itemId: ID; skip: boolean; slides: Slide[] }[] {
+    return this.entries.map((e) => ({ itemId: e.resolved.item.id, skip: e.skip, slides: e.slides }))
+  }
+
   setOnline(online: boolean): void {
     this.online = online
     for (const e of this.entries) e.skip = this.skipOf(e)
