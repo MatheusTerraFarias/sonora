@@ -3,15 +3,17 @@ import type { MediaItem } from '../../../shared/types'
 import { strings } from '../../shared/strings'
 import { AddToServiceButton } from '../components/AddToServiceButton'
 import { MediaThumb } from '../components/MediaThumb'
+import { ErrorBanner, useSafe } from '../components/useSafe'
 
 export function Media(): JSX.Element {
   const [items, setItems] = useState<MediaItem[]>([])
   const [importing, setImporting] = useState(false)
-  const [error, setError] = useState(false)
+  const { error, run } = useSafe()
 
   const reload = useCallback(async (): Promise<void> => {
-    setItems(await window.sonora.media.list())
-  }, [])
+    const r = await run(() => window.sonora.media.list())
+    if (r.ok) setItems(r.value)
+  }, [run])
 
   useEffect(() => {
     void reload()
@@ -19,21 +21,15 @@ export function Media(): JSX.Element {
 
   const importFiles = async (): Promise<void> => {
     setImporting(true)
-    setError(false)
-    try {
-      await window.sonora.media.pickAndImport()
-      await reload()
-    } catch {
-      setError(true)
-    } finally {
-      setImporting(false)
-    }
+    const r = await run(() => window.sonora.media.pickAndImport())
+    if (r.ok) await reload()
+    setImporting(false)
   }
 
   const remove = async (m: MediaItem): Promise<void> => {
     if (!window.confirm(strings.media.confirmDelete)) return
-    await window.sonora.media.remove(m.id)
-    await reload()
+    const r = await run(() => window.sonora.media.remove(m.id))
+    if (r.ok) await reload()
   }
 
   return (
@@ -43,7 +39,7 @@ export function Media(): JSX.Element {
         <button type="button" className="btn btn--primary" disabled={importing} onClick={importFiles}>
           {importing ? strings.media.importing : strings.media.import}
         </button>
-        {error && <span className="hint hint--error">{strings.common.error}</span>}
+        <ErrorBanner show={error} />
       </div>
       {items.length === 0 && <p className="hint">{strings.media.empty}</p>}
       <ul className="media-grid">

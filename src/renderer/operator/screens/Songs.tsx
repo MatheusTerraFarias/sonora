@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Song } from '../../../shared/types'
 import { strings } from '../../shared/strings'
 import { SearchBox } from '../components/SearchBox'
+import { ErrorBanner, useSafe } from '../components/useSafe'
 import { SongEditor } from './SongEditor'
 
 type Selection = Song | 'new' | null
@@ -11,9 +12,15 @@ export function Songs(): JSX.Element {
   const [songs, setSongs] = useState<Song[]>([])
   const [selection, setSelection] = useState<Selection>(null)
 
+  const { error, run } = useSafe()
+  const latest = useRef(0)
+
   const reload = useCallback(async (): Promise<void> => {
-    setSongs(await window.sonora.songs.list(query))
-  }, [query])
+    const id = ++latest.current
+    const r = await run(() => window.sonora.songs.list(query))
+    // ignora resposta de uma busca mais antiga
+    if (r.ok && id === latest.current) setSongs(r.value)
+  }, [query, run])
 
   useEffect(() => {
     void reload()
@@ -43,6 +50,7 @@ export function Songs(): JSX.Element {
             </li>
           ))}
         </ul>
+        <ErrorBanner show={error} />
         {songs.length === 0 && <p className="hint">{strings.songs.empty}</p>}
       </aside>
       <div className="detail-pane">

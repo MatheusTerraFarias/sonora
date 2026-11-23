@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { MediaItem } from '../../../shared/types'
 import { strings } from '../../shared/strings'
+import { ErrorBanner, useSafe } from './useSafe'
 
 export interface NoticeData {
   title: string
@@ -9,7 +10,8 @@ export interface NoticeData {
 }
 
 interface Props {
-  onSubmit: (data: NoticeData) => void | Promise<void>
+  /** retorna true quando o aviso foi salvo; o formulário só é limpo nesse caso */
+  onSubmit: (data: NoticeData) => boolean | Promise<boolean>
   submitLabel?: string
   disabled?: boolean
 }
@@ -21,9 +23,13 @@ export function NoticeForm({ onSubmit, submitLabel = strings.notices.submit, dis
   const [bg, setBg] = useState('')
   const [media, setMedia] = useState<MediaItem[]>([])
   const [error, setError] = useState<string | null>(null)
+  const safe = useSafe()
 
   useEffect(() => {
-    window.sonora.media.list().then((all) => setMedia(all.filter((m) => m.kind !== 'audio')))
+    void safe.run(() => window.sonora.media.list()).then((r) => {
+      if (r.ok) setMedia(r.value.filter((m) => m.kind !== 'audio'))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const submit = async (e: React.FormEvent): Promise<void> => {
@@ -33,7 +39,8 @@ export function NoticeForm({ onSubmit, submitLabel = strings.notices.submit, dis
       return
     }
     setError(null)
-    await onSubmit({ title: title.trim(), body, backgroundMediaId: bg || null })
+    const ok = await onSubmit({ title: title.trim(), body, backgroundMediaId: bg || null })
+    if (!ok) return
     setTitle('')
     setBody('')
     setBg('')
@@ -60,6 +67,7 @@ export function NoticeForm({ onSubmit, submitLabel = strings.notices.submit, dis
           ))}
         </select>
       </label>
+      <ErrorBanner show={safe.error} />
       {error && <span className="hint hint--error">{error}</span>}
       <div>
         <button type="submit" className="btn btn--primary" disabled={disabled}>

@@ -4,6 +4,7 @@ import type { Passage } from '../../../shared/slides'
 import { strings } from '../../shared/strings'
 import { AddToServiceButton } from '../components/AddToServiceButton'
 import { SearchBox } from '../components/SearchBox'
+import { ErrorBanner, useSafe } from '../components/useSafe'
 
 export function Bible(): JSX.Element {
   const [translations, setTranslations] = useState<TranslationInfo[]>([])
@@ -15,9 +16,12 @@ export function Bible(): JSX.Element {
   const [results, setResults] = useState<{ ref: string; text: string }[] | null>(null)
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const { error, run } = useSafe()
 
   const loadTranslations = async (selectId?: string): Promise<void> => {
-    const list = await window.sonora.bible.translations()
+    const res = await run(() => window.sonora.bible.translations())
+    if (!res.ok) return
+    const list = res.value
     setTranslations(list)
     setTranslation((cur) => selectId ?? (list.some((t) => t.id === cur) ? cur : (list[0]?.id ?? '')))
   }
@@ -35,9 +39,9 @@ export function Bible(): JSX.Element {
     }
     let cancelled = false
     const t = setTimeout(async () => {
-      const p = await window.sonora.bible.passage(translation, ref)
-      if (!cancelled) {
-        setPassage(p)
+      const res = await run(() => window.sonora.bible.passage(translation, ref))
+      if (!cancelled && res.ok) {
+        setPassage(res.value)
         setSearched(true)
       }
     }, 200)
@@ -45,6 +49,7 @@ export function Bible(): JSX.Element {
       cancelled = true
       clearTimeout(t)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translation, ref])
 
   // busca por palavra
@@ -55,13 +60,14 @@ export function Bible(): JSX.Element {
     }
     let cancelled = false
     const t = setTimeout(async () => {
-      const r = await window.sonora.bible.search(translation, words, 50)
-      if (!cancelled) setResults(r)
+      const res = await run(() => window.sonora.bible.search(translation, words, 50))
+      if (!cancelled && res.ok) setResults(res.value)
     }, 250)
     return () => {
       cancelled = true
       clearTimeout(t)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translation, words])
 
   const importTranslation = async (): Promise<void> => {
@@ -101,6 +107,7 @@ export function Bible(): JSX.Element {
       </div>
       {translations.length === 0 && <p className="hint">{strings.bible.noTranslations}</p>}
 
+      <ErrorBanner show={error} />
       <div className="bible-grid">
         <div className="bible-col">
           <label className="form__row">

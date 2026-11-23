@@ -7,6 +7,7 @@ import { ArrangementChips } from '../components/ArrangementChips'
 import { AttachmentField } from '../components/AttachmentField'
 import { AddToServiceButton } from '../components/AddToServiceButton'
 import { SlideThumb } from '../components/SlideThumb'
+import { ErrorBanner, useSafe } from '../components/useSafe'
 
 interface Props {
   /** null = música nova */
@@ -26,6 +27,7 @@ export function SongEditor({ song, onSaved, onDeleted }: Props): JSX.Element {
   const [attachmentValid, setAttachmentValid] = useState(true)
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const safe = useSafe()
 
   const save = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -57,8 +59,8 @@ export function SongEditor({ song, onSaved, onDeleted }: Props): JSX.Element {
 
   const remove = async (): Promise<void> => {
     if (!song || !window.confirm(strings.songs.confirmDelete)) return
-    await window.sonora.songs.remove(song.id)
-    onDeleted()
+    const r = await safe.run(() => window.sonora.songs.remove(song.id))
+    if (r.ok) onDeleted()
   }
 
   return (
@@ -108,6 +110,7 @@ export function SongEditor({ song, onSaved, onDeleted }: Props): JSX.Element {
 
       {error && <span className="hint hint--error">{error}</span>}
       {status === 'error' && <span className="hint hint--error">{strings.common.error}</span>}
+      <ErrorBanner show={safe.error} />
       <div className="form__actions">
         <button type="submit" className="btn btn--primary" disabled={status === 'saving' || !attachmentValid}>
           {status === 'saving' ? strings.common.saving : status === 'saved' ? strings.common.saved : strings.common.save}

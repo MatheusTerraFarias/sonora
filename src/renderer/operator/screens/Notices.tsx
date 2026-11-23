@@ -8,13 +8,15 @@ export function Notices(): JSX.Element {
   const serviceId = useOperatorStore((s) => s.currentServiceId)
   const [message, setMessage] = useState<string | null>(null)
 
-  const submit = async (data: NoticeData): Promise<void> => {
-    if (!serviceId) return
+  const submit = async (data: NoticeData): Promise<boolean> => {
+    if (!serviceId) return false
     try {
       await window.sonora.services.addItem(serviceId, { kind: 'notice', ...data })
       setMessage(strings.notices.added)
+      return true
     } catch {
       setMessage(strings.common.error)
+      return false
     }
   }
 

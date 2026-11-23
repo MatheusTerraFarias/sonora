@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { MediaItem, SongAttachment } from '../../../shared/types'
 import { parseVideoId } from '../../../shared/youtube'
 import { strings } from '../../shared/strings'
+import { ErrorBanner, useSafe } from './useSafe'
 
 type Mode = 'none' | 'youtube' | 'media'
 
@@ -17,9 +18,13 @@ export function AttachmentField({ value, songTitle, onChange }: Props): JSX.Elem
   const [mode, setMode] = useState<Mode>(value?.kind ?? 'none')
   const [link, setLink] = useState(value?.kind === 'youtube' ? `https://youtu.be/${value.videoId}` : '')
   const [media, setMedia] = useState<MediaItem[]>([])
+  const safe = useSafe()
 
   useEffect(() => {
-    window.sonora.media.list().then((all) => setMedia(all.filter((m) => m.kind !== 'image')))
+    void safe.run(() => window.sonora.media.list()).then((r) => {
+      if (r.ok) setMedia(r.value.filter((m) => m.kind !== 'image'))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const videoId = parseVideoId(link)
@@ -71,6 +76,7 @@ export function AttachmentField({ value, songTitle, onChange }: Props): JSX.Elem
           </select>
         )}
       </div>
+      <ErrorBanner show={safe.error} />
       {invalid && <span className="hint hint--error">{strings.songs.attachmentInvalid}</span>}
     </div>
   )
