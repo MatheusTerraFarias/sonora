@@ -31,11 +31,17 @@ export function createProjectionBrowserWindow(
   else win.loadFile(join(__dirname, '../renderer/telao/index.html'))
   return {
     moveTo(bounds) {
+      // esconde primeiro: o SO pode ter levado a janela ao monitor do operador
+      win.hide()
       win.setFullScreen(false)
       win.setBounds(bounds)
       win.setFullScreen(true)
+      win.showInactive()
     },
-    destroy: () => win.destroy(),
+    destroy: () => {
+      if (!win.isDestroyed()) win.hide()
+      win.destroy()
+    },
     isDestroyed: () => win.isDestroyed()
   }
 }
