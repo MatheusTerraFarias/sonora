@@ -266,3 +266,8 @@
   color: #ff9aa8;
   white-space: nowrap;
 }
+.preview-box__status--error {
+  color: #ff9aa8;
+  font-weight: 600;
+  opacity: 1;
+}

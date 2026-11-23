@@ -63,16 +63,52 @@ export interface PlayerSample {
   errorCode: number | null
 }
 
+/** embed (padrão) ou página de watch (vídeos que não permitem incorporação) */
+export type YoutubeMode = 'embed' | 'watch'
+
+/** estado do vídeo no telão, informado ao operador */
+export type YoutubeStatus = 'loading' | 'ad' | 'playing' | 'paused' | 'error'
+export const YOUTUBE_STATUSES: readonly YoutubeStatus[] = ['loading', 'ad', 'playing', 'paused', 'error']
+
+/**
+ * Erro que vale para a amostra. Na página de watch, um vídeo tocando de verdade ignora a
+ * "tela de erro" (pode ser um falso positivo da página); parado, o erro vale.
+ */
+function sampleError(sample: PlayerSample, mode: YoutubeMode): number | null {
+  if (mode === 'watch' && sample.currentTime > 0 && !sample.paused && !sample.adShowing) return null
+  return sample.errorCode
+}
+
 /**
  * Portão do telão: a webview só aparece com o conteúdo tocando de verdade (currentTime > 0,
  * sem pausa, sem anúncio). Uma pausa depois de visível mantém o quadro, para o telão não voltar
- * ao slide anterior quando o operador pausa. Erros 101/150/153 pedem a página de watch.
+ * ao slide anterior quando o operador pausa. No embed, erros 101/150/153 pedem a página de watch;
+ * na página de watch qualquer erro só mantém invisível.
  */
-export function youtubeGate(sample: PlayerSample, prev: GateState = 'hidden'): GateState {
-  if (sample.errorCode !== null && EMBED_REFUSED.has(sample.errorCode)) return 'fallback'
-  if (sample.errorCode !== null || sample.adShowing || !(sample.currentTime > 0)) return 'hidden'
+export function youtubeGate(sample: PlayerSample, prev: GateState = 'hidden', mode: YoutubeMode = 'embed'): GateState {
+  const err = sampleError(sample, mode)
+  if (mode === 'embed' && err !== null && EMBED_REFUSED.has(err)) return 'fallback'
+  if (err !== null || sample.adShowing || !(sample.currentTime > 0)) return 'hidden'
   if (!sample.paused) return 'visible'
   return prev === 'visible' ? 'visible' : 'hidden'
+}
+
+/**
+ * Status para o operador a partir da amostra do player (null = página ainda sem resposta) e do
+ * portão atual. Embed recusado não é erro: o telão vai tentar a página de watch.
+ */
+export function youtubeStatus(
+  sample: (PlayerSample & { found: boolean }) | null,
+  gate: GateState,
+  mode: YoutubeMode
+): YoutubeStatus {
+  if (!sample) return 'loading'
+  const err = sampleError(sample, mode)
+  if (err !== null) return mode === 'embed' && EMBED_REFUSED.has(err) ? 'loading' : 'error'
+  if (!sample.found) return 'loading'
+  if (sample.adShowing) return 'ad'
+  if (gate === 'visible') return sample.paused ? 'paused' : 'playing'
+  return sample.paused ? 'paused' : 'loading'
 }
 
 /**

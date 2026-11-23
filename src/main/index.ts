@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, screen } from 'electron'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { openDatabase, type Db } from './db/database'
@@ -11,6 +11,7 @@ import { createServicesRepo, resolveItem } from './repos/services'
 import { createFavoritesRepo, type YoutubeFavorite } from './repos/favorites'
 import { createSettingsRepo } from './repos/settings'
 import { LiveController } from './live/liveController'
+import { Connectivity, probeYoutube } from './connectivity'
 import { strings } from './strings'
 import { createOperatorWindow } from './windows/operatorWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
@@ -20,6 +21,7 @@ import { initUpdater } from './updater'
 import { identifyDisplays } from './windows/identifyWindows'
 import { fetchOembed, hardenWebviews } from './youtube/session'
 import type { DisplayInfo } from '../shared/displays'
+import { YOUTUBE_STATUSES } from '../shared/youtube'
 import type { LiveProgress, LiveState, MediaKind, Overlay, ServiceItemData, Settings } from '../shared/types'
 
 registerMediaScheme()
@@ -154,7 +156,17 @@ app.whenReady().then(() => {
   handle('live:media', (cmd: { play?: boolean; volume?: number; position?: number }) => live.media(cmd))
   handle('live:loadService', (serviceId: string) => live.loadService(serviceId))
   handle('live:outline', () => live.outline())
-  handle('live:setOnline', (online: boolean) => live.setOnline(online))
+  // conexão = navigator.onLine do operador + teste real ao YouTube (Wi-Fi sem internet)
+  const connectivity = new Connectivity({
+    probe: () => probeYoutube((url, init) => net.fetch(url, init)),
+    onChange: (online) => {
+      live.setOnline(online)
+      broadcast('live:online', online)
+    }
+  })
+  handle('live:setOnline', (online: boolean) => connectivity.setNavigatorOnline(online === true))
+  connectivity.start()
+  app.on('before-quit', () => connectivity.stop())
   const opWin = createOperatorWindow()
   operatorWin = opWin
   opWin.on('closed', () => app.quit())
@@ -164,7 +176,8 @@ app.whenReady().then(() => {
     const position = Number(p.position)
     const duration = Number(p.duration)
     if (!Number.isFinite(position) || !Number.isFinite(duration)) return
-    opWin.webContents.send('live:progress', { key: p.key, position, duration } satisfies LiveProgress)
+    const status = (YOUTUBE_STATUSES as readonly unknown[]).includes(p.status) ? p.status : undefined
+    opWin.webContents.send('live:progress', { key: p.key, position, duration, status } satisfies LiveProgress)
   })
   const primaryId = (): number => screen.getPrimaryDisplay().id
   const operatorDisplayId = (): number =>

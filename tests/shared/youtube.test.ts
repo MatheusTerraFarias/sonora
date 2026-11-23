@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { guestMayNavigate, isYoutubeUrl, parseVideoId, youtubeGate } from '../../src/shared/youtube'
+import { guestMayNavigate, isYoutubeUrl, parseVideoId, youtubeGate, youtubeStatus } from '../../src/shared/youtube'
 
 describe('parseVideoId', () => {
   const id = 'dQw4w9WgXcQ'
@@ -102,5 +102,45 @@ describe('guestMayNavigate', () => {
       'lixo'
     ])
       expect(guestMayNavigate(u), u).toBe(false)
+  })
+})
+
+describe('youtubeGate na página de watch', () => {
+  const playing = { currentTime: 3, paused: false, adShowing: false, errorCode: null }
+  it('erro não pede outro modo: só mantém invisível', () => {
+    expect(youtubeGate({ ...playing, currentTime: 0, errorCode: 150 }, 'hidden', 'watch')).toBe('hidden')
+    expect(youtubeGate({ ...playing, currentTime: 0, errorCode: 100 }, 'hidden', 'watch')).toBe('hidden')
+  })
+  it('vídeo tocando de verdade ignora tela de erro (falso positivo da página)', () => {
+    expect(youtubeGate({ ...playing, errorCode: 150 }, 'hidden', 'watch')).toBe('visible')
+  })
+})
+
+describe('youtubeStatus', () => {
+  const s = { found: true, currentTime: 3, paused: false, adShowing: false, errorCode: null }
+  it('sem amostra ou sem <video>: carregando', () => {
+    expect(youtubeStatus(null, 'hidden', 'embed')).toBe('loading')
+    expect(youtubeStatus({ ...s, found: false, currentTime: 0 }, 'hidden', 'embed')).toBe('loading')
+  })
+  it('anúncio', () => {
+    expect(youtubeStatus({ ...s, adShowing: true }, 'hidden', 'embed')).toBe('ad')
+  })
+  it('tocando e pausado', () => {
+    expect(youtubeStatus(s, 'visible', 'embed')).toBe('playing')
+    expect(youtubeStatus({ ...s, paused: true }, 'visible', 'embed')).toBe('paused')
+    expect(youtubeStatus({ ...s, paused: true, currentTime: 0 }, 'hidden', 'embed')).toBe('paused')
+  })
+  it('tocando mas portão ainda fechado: carregando', () => {
+    expect(youtubeStatus({ ...s, currentTime: 0 }, 'hidden', 'embed')).toBe('loading')
+  })
+  it('embed recusado vai para a página de watch: carregando, não erro', () => {
+    expect(youtubeStatus({ ...s, errorCode: 150 }, 'hidden', 'embed')).toBe('loading')
+  })
+  it('outros erros no embed e qualquer erro na página de watch: erro', () => {
+    expect(youtubeStatus({ ...s, errorCode: 100 }, 'hidden', 'embed')).toBe('error')
+    expect(youtubeStatus({ ...s, found: false, currentTime: 0, errorCode: 150 }, 'hidden', 'watch')).toBe('error')
+  })
+  it('na página de watch, vídeo tocando ignora tela de erro', () => {
+    expect(youtubeStatus({ ...s, errorCode: 150 }, 'visible', 'watch')).toBe('playing')
   })
 })

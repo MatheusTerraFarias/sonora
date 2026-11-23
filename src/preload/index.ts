@@ -91,7 +91,10 @@ export const api = {
     loadService: call('live:loadService') as (serviceId: ID) => Promise<void>,
     /** itens do culto carregado, com slides e `skip` */
     outline: call('live:outline') as () => Promise<{ itemId: ID; skip: boolean; slides: Slide[] }[]>,
-    setOnline: call('live:setOnline') as (online: boolean) => Promise<void>,
+    /** operador → main: navigator.onLine; retorna a conexão combinada (com o teste real do main) */
+    setOnline: call('live:setOnline') as (online: boolean) => Promise<boolean>,
+    /** conexão combinada mudou (ex.: Wi-Fi sem internet detectado pelo teste do main) */
+    onOnline: (cb: (online: boolean) => void): (() => void) => on('live:online', cb),
     onState: (cb: (s: LiveState) => void): (() => void) => on('live:state', cb),
     /** telão → main: progresso real da reprodução (~4 Hz) */
     reportProgress: (p: LiveProgress): void => ipcRenderer.send('live:progress', p),

@@ -1,3 +1,5 @@
+import type { YoutubeStatus } from './youtube';
+
 export type ID = string;
 
 export interface SongPart {
@@ -81,6 +83,8 @@ export interface LiveProgress {
   key: string;
   position: number;
   duration: number;
+  /** só YouTube: estado do portão do telão (mídia local não envia) */
+  status?: YoutubeStatus;
 }
 
 /** clear = esconde texto, mantém fundo */

@@ -161,6 +161,13 @@ export const strings = {
     attachment: 'Projetar vídeo da música',
     attachmentFailed: 'Não foi possível projetar o vídeo da música.',
     youtubeItem: 'Vídeo do YouTube',
+    youtubeStatus: {
+      loading: 'Carregando…',
+      ad: 'Anúncio — telão oculto',
+      playing: 'Tocando',
+      paused: 'Pausado',
+      error: 'Vídeo indisponível'
+    },
     mediaControlsTitle: 'Controles de mídia',
     controlsOnlyLive: 'Projete este item para controlar a reprodução.',
     play: 'Reproduzir',

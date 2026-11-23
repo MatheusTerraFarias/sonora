@@ -3,6 +3,7 @@ export interface WebviewElement extends HTMLElement {
   executeJavaScript(code: string): Promise<unknown>
   insertCSS(css: string): Promise<string>
   loadURL(url: string): Promise<void>
+  reload(): void
   getURL(): string
   getTitle(): string
   canGoBack(): boolean

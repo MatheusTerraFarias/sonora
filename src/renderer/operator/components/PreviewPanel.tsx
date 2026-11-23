@@ -27,7 +27,12 @@ const OVERLAY_LABEL = {
 /** Prévia (próximo slide) e Ao vivo (estado atual): miniaturas leves, nunca uma segunda cópia do vídeo. */
 export function PreviewPanel({ live, next, progress }: Props): JSX.Element {
   const c = live.content
-  const time = progress ? `${formatTime(progress.position)} / ${formatTime(progress.duration)}` : strings.operation.unknownTime
+  const time =
+    progress && progress.duration > 0
+      ? `${formatTime(progress.position)} / ${formatTime(progress.duration)}`
+      : strings.operation.unknownTime
+  // sem relato do telão ainda (ou sem telão): carregando
+  const ytStatus = progress?.status ?? 'loading'
   return (
     <aside className="preview-panel">
       <section>
@@ -59,7 +64,13 @@ export function PreviewPanel({ live, next, progress }: Props): JSX.Element {
           {c.type === 'youtube' && (
             <>
               <div className="preview-box__yt">{strings.operation.youtubeItem}</div>
-              <span className="preview-box__title">{time}</span>
+              <span
+                className={ytStatus === 'error' ? 'preview-box__title preview-box__status--error' : 'preview-box__title'}
+                role={ytStatus === 'error' ? 'alert' : undefined}
+              >
+                {strings.operation.youtubeStatus[ytStatus]}
+                {ytStatus === 'playing' || ytStatus === 'paused' ? ` · ${time}` : ''}
+              </span>
             </>
           )}
           {c.type === 'none' && live.overlay === 'none' && <p className="hint">{strings.operation.liveNothing}</p>}

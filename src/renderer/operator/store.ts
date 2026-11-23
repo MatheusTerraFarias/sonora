@@ -8,7 +8,7 @@ interface OperatorState {
   currentServiceId: string | null
   setSection: (s: Section) => void
   setCurrentServiceId: (id: string | null) => void
-  /** navigator.onLine + eventos online/offline (o main recebe via live.setOnline) */
+  /** conexão combinada do main: navigator.onLine (enviado via live.setOnline) + teste real ao YouTube */
   onlineStatus: boolean
   setOnlineStatus: (online: boolean) => void
 }
@@ -23,28 +23,37 @@ export const useOperatorStore = create<OperatorState>((set) => ({
 }))
 
 /**
- * Acompanha a conexão: avisa o main (live.setOnline) e só então atualiza o store,
- * para que quem recarrega o culto ao ver a mudança já receba os `skip` novos.
- * Retorna o cancelamento.
+ * Acompanha a conexão: avisa o main (live.setOnline) do navigator.onLine e guarda no store a
+ * conexão combinada que ele devolve (o main já recalculou os `skip` quando ela chega aqui).
+ * Mudanças vindas só do teste do main chegam por live.onOnline. Retorna o cancelamento.
  */
 export function watchOnlineStatus(): () => void {
   let seq = 0
+  const set = (online: boolean): void => useOperatorStore.getState().setOnlineStatus(online)
   const apply = (online: boolean): void => {
     const mine = ++seq
     void window.sonora.live
       .setOnline(online)
-      .catch(() => undefined)
-      .then(() => {
-        if (mine === seq) useOperatorStore.getState().setOnlineStatus(online)
+      .then(
+        (combined) => (typeof combined === 'boolean' ? combined : online),
+        () => online
+      )
+      .then((value) => {
+        if (mine === seq) set(value)
       })
   }
   const onOnline = (): void => apply(true)
   const onOffline = (): void => apply(false)
   window.addEventListener('online', onOnline)
   window.addEventListener('offline', onOffline)
+  const offMain = window.sonora.live.onOnline((online) => {
+    seq++
+    set(online)
+  })
   apply(navigator.onLine)
   return () => {
     window.removeEventListener('online', onOnline)
     window.removeEventListener('offline', onOffline)
+    offMain()
   }
 }

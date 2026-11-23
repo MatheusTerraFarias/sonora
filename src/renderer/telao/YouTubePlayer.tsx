@@ -4,10 +4,12 @@ import {
   embedUrl,
   watchUrl,
   youtubeGate,
+  youtubeStatus,
   YOUTUBE_EMBED_REFERRER,
   YOUTUBE_PARTITION,
   type GateState,
-  type PlayerSample
+  type PlayerSample,
+  type YoutubeStatus
 } from '../../shared/youtube'
 import type { WebviewElement } from '../shared/webview'
 
@@ -16,6 +18,10 @@ type YoutubeContent = Extract<LiveContent, { type: 'youtube' }>
 const TICK_MS = 250
 const TICK_VISIBLE_MS = 100
 const FADE_MS = 300
+/** um erro só vira "Vídeo indisponível" para o operador depois de persistir por este tempo */
+const ERROR_CONFIRM_MS = 1500
+/** página que não carregou (ex.: sem internet): nova tentativa depois de */
+const RELOAD_AFTER_FAIL_MS = 10_000
 
 /** Esconde tudo menos o <video>, em tela cheia (sem título, logo, telas de fim ou da página de watch). */
 const VIDEO_ONLY_CSS = `
@@ -112,6 +118,8 @@ export function YouTubePlayer({ content }: { content: YoutubeContent }): JSX.Ele
   const [gate, setGate] = useState<GateState>('hidden')
   const gateRef = useRef<GateState>('hidden')
   const ready = useRef(false)
+  /** a página principal da webview não carregou (sem rede, DNS…) */
+  const failed = useRef(false)
   const want = useRef<Want>({ play: playing, volume, seekTo: null })
 
   want.current.play = playing
@@ -125,24 +133,51 @@ export function YouTubePlayer({ content }: { content: YoutubeContent }): JSX.Ele
     const wv = ref.current
     if (!wv) return
     ready.current = false
+    failed.current = false
     gateRef.current = 'hidden'
     setGate('hidden')
+    let retry: ReturnType<typeof setTimeout> | undefined
     const onReady = (): void => {
       ready.current = true
       void wv.insertCSS(VIDEO_ONLY_CSS).catch(() => undefined)
     }
+    const onFinish = (): void => {
+      failed.current = false
+    }
+    // -3 = carregamento cancelado (troca de página): não é falha
+    const onFail = (e: Event): void => {
+      const ev = e as Event & { errorCode?: number; isMainFrame?: boolean }
+      if (ev.isMainFrame === false || ev.errorCode === -3) return
+      failed.current = true
+      clearTimeout(retry)
+      retry = setTimeout(() => {
+        try {
+          wv.reload()
+        } catch {
+          // webview já desmontada
+        }
+      }, RELOAD_AFTER_FAIL_MS)
+    }
     // (did-start-loading não serve para "desarmar": dispara também com iframes de anúncio da página)
     wv.addEventListener('dom-ready', onReady)
+    wv.addEventListener('did-finish-load', onFinish)
+    wv.addEventListener('did-fail-load', onFail)
     return () => {
+      clearTimeout(retry)
       wv.removeEventListener('dom-ready', onReady)
+      wv.removeEventListener('did-finish-load', onFinish)
+      wv.removeEventListener('did-fail-load', onFail)
     }
   }, [mode])
 
-  // portão + comandos + progresso: a cada 250 ms escondido, 100 ms visível (anúncio no meio some rápido)
+  // portão + comandos + progresso: a cada 250 ms escondido, 100 ms visível (anúncio no meio some rápido).
+  // O status vai ao operador junto com o progresso (~4 Hz), também enquanto a página carrega.
   useEffect(() => {
     let stopped = false
     let timer: ReturnType<typeof setTimeout> | undefined
     let lastReport = 0
+    let errorSince: number | null = null
+    const last = { position: 0, duration: 0 }
     const schedule = (): void => {
       if (!stopped) timer = setTimeout(tick, gateRef.current === 'visible' ? TICK_VISIBLE_MS : TICK_MS)
     }
@@ -154,41 +189,58 @@ export function YouTubePlayer({ content }: { content: YoutubeContent }): JSX.Ele
         el.style.opacity = '0'
       }
     }
+    /** erro só depois de persistir: uma tela de erro passageira não assusta o operador */
+    const report = (raw: YoutubeStatus): void => {
+      const now = performance.now()
+      if (raw === 'error') errorSince ??= now
+      else errorSince = null
+      const status: YoutubeStatus = raw === 'error' && now - (errorSince ?? now) < ERROR_CONFIRM_MS ? 'loading' : raw
+      if (now - lastReport < TICK_MS) return
+      lastReport = now
+      window.sonora.live.reportProgress({ key: videoId, position: last.position, duration: last.duration, status })
+    }
     const tick = (): void => {
       const wv = ref.current
-      if (!wv || !ready.current) return schedule()
+      if (!wv || !ready.current) {
+        report(failed.current ? 'error' : 'loading')
+        return schedule()
+      }
       wv.executeJavaScript(tickScript(want.current))
         .then((raw) => {
           const s = raw as Sample | null
-          if (!s || stopped) return
+          if (stopped) return
+          if (!s) {
+            report(failed.current ? 'error' : 'loading')
+            return
+          }
           if (s.seeked) want.current.seekTo = null
           const sample: PlayerSample = {
             currentTime: s.currentTime,
             paused: s.paused,
             adShowing: s.adShowing,
-            // na página de watch o erro de incorporação não se aplica
-            errorCode: mode === 'watch' ? null : s.errorCode
+            errorCode: s.errorCode
           }
-          const next = s.found || sample.errorCode !== null ? youtubeGate(sample, gateRef.current) : 'hidden'
+          const next = s.found || sample.errorCode !== null ? youtubeGate(sample, gateRef.current, mode) : 'hidden'
           if (next !== 'visible') hideNow()
           if (next === 'fallback') {
             ready.current = false
             gateRef.current = 'hidden'
             setGate('hidden')
             setMode('watch')
+            report('loading')
             return
           }
           if (next !== gateRef.current) {
             gateRef.current = next
             setGate(next)
           }
-          const now = performance.now()
-          if (s.found && !s.adShowing && Number.isFinite(s.duration) && s.duration > 0 && now - lastReport >= TICK_MS) {
-            lastReport = now
-            window.sonora.live.reportProgress({ key: videoId, position: s.currentTime, duration: s.duration })
+          if (s.found && !s.adShowing && Number.isFinite(s.duration) && s.duration > 0) {
+            last.position = s.currentTime
+            last.duration = s.duration
           }
+          report(failed.current && !s.found ? 'error' : youtubeStatus({ ...sample, found: s.found }, next, mode))
         })
-        .catch(() => undefined)
+        .catch(() => report(failed.current ? 'error' : 'loading'))
         .finally(schedule)
     }
     schedule()
