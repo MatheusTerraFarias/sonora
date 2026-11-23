@@ -51,3 +51,41 @@ test('versículo maior que maxChars é quebrado em fronteira de palavra', () => 
 test('passagem vazia não gera slides', () => {
   expect(bibleSlides({ title: 'X', verses: [] })).toEqual([])
 })
+
+import { buildSlides } from '../../src/shared/slides'
+import type { ResolvedItem, Song } from '../../src/shared/types'
+
+const song = {
+  id: 's1',
+  title: 'T',
+  parts: [
+    { id: 'p1', label: 'E1', slides: ['a', 'b'] },
+    { id: 'p2', label: 'R', slides: ['r'] },
+    { id: 'p3', label: 'E2', slides: ['c'] }
+  ],
+  arrangement: ['p1', 'p2', 'p3', 'p2']
+} as unknown as Song
+const mk = (data: any, missing = false): ResolvedItem => ({
+  item: { id: 'i', serviceId: 'x', position: 0, data },
+  missing,
+  title: 't'
+})
+const deps = { song: (id: string) => (id === 's1' ? song : null), passage: () => null }
+
+test('buildSlides: música segue o arranjo e usa o rótulo da parte', () => {
+  const s = buildSlides(mk({ kind: 'song', songId: 's1' }), deps)
+  expect(s.map((x) => x.label)).toEqual(['E1', 'E1', 'R', 'E2', 'R'])
+  expect(s.map((x) => x.text)).toEqual(['a', 'b', 'r', 'c', 'r'])
+})
+test('buildSlides: aviso gera 1 slide; mídia, youtube e ausente geram []', () => {
+  expect(buildSlides(mk({ kind: 'notice', title: 'Aviso', body: 'corpo', backgroundMediaId: null }), deps)).toEqual([
+    { label: 'Aviso', title: 'Aviso', text: 'corpo' }
+  ])
+  expect(buildSlides(mk({ kind: 'media', mediaId: 'm' }), deps)).toEqual([])
+  expect(buildSlides(mk({ kind: 'youtube', videoId: 'v', title: '', thumbnail: '' }), deps)).toEqual([])
+  expect(buildSlides(mk({ kind: 'song', songId: 's1' }, true), deps)).toEqual([])
+})
+test('buildSlides: bíblia usa passage', () => {
+  const d = { ...deps, passage: () => ({ title: 'João 3:16', verses: [{ n: 16, text: 'x' }] }) }
+  expect(buildSlides(mk({ kind: 'bible', ref: 'João 3:16', translation: 'T' }), d)).toHaveLength(1)
+})

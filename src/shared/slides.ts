@@ -1,4 +1,4 @@
-import type { Slide } from './types'
+import type { ResolvedItem, Slide, Song } from './types'
 
 export interface Passage {
   /** referência do trecho, ex.: "João 3:16-17" */
@@ -69,4 +69,35 @@ export function bibleSlides(passage: Passage, maxChars = 400): Slide[] {
   }
   flush()
   return slides
+}
+
+export interface SlideDeps {
+  song(id: string): Song | null
+  passage(translation: string, ref: string): Passage | null
+}
+
+/** Slides de um item do culto. Mídia, YouTube e itens ausentes não têm slides. */
+export function buildSlides(resolved: ResolvedItem, deps: SlideDeps): Slide[] {
+  if (resolved.missing) return []
+  const d = resolved.item.data
+  switch (d.kind) {
+    case 'song': {
+      const song = deps.song(d.songId)
+      if (!song) return []
+      const out: Slide[] = []
+      for (const partId of song.arrangement) {
+        const part = song.parts.find((p) => p.id === partId)
+        if (part) for (const text of part.slides) out.push({ label: part.label, text })
+      }
+      return out
+    }
+    case 'bible': {
+      const p = deps.passage(d.translation, d.ref)
+      return p ? bibleSlides(p) : []
+    }
+    case 'notice':
+      return [{ label: 'Aviso', title: d.title, text: d.body }]
+    default:
+      return []
+  }
 }

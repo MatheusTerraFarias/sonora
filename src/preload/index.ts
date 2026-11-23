@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ID, MediaItem, MediaKind, ResolvedItem, Service, ServiceItem, ServiceItemData, Settings, Song } from '../shared/types'
+import type { ID, LiveState, MediaItem, MediaKind, Overlay, ResolvedItem, Service, ServiceItem, ServiceItemData, Settings, Song } from '../shared/types'
 import type { SongInput } from '../main/repos/songs'
 import type { TranslationInfo } from '../main/bible/bibleStore'
 import type { YoutubeFavorite } from '../main/repos/favorites'
@@ -77,6 +77,18 @@ export const api = {
     update: call('settings:update') as (patch: Partial<Settings>) => Promise<Settings>,
     /** recebe o settings completo sempre que algo é alterado; retorna a função de cancelamento */
     onChange: (cb: (s: Settings) => void): (() => void) => on('settings:changed', cb)
+  },
+  live: {
+    get: call('live:get') as () => Promise<LiveState>,
+    goTo: call('live:goTo') as (itemId: ID, slideIndex: number) => Promise<void>,
+    next: call('live:next') as () => Promise<void>,
+    prev: call('live:prev') as () => Promise<void>,
+    setOverlay: call('live:setOverlay') as (o: Overlay) => Promise<void>,
+    media: call('live:media') as (cmd: { play?: boolean; volume?: number; position?: number }) => Promise<void>,
+    /** chamar de novo sempre que o culto for alterado */
+    loadService: call('live:loadService') as (serviceId: ID) => Promise<void>,
+    setOnline: call('live:setOnline') as (online: boolean) => Promise<void>,
+    onState: (cb: (s: LiveState) => void): (() => void) => on('live:state', cb)
   },
   on
 }

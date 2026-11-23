@@ -10,12 +10,18 @@ import { handleMediaProtocol, registerMediaScheme } from './media/protocol'
 import { createServicesRepo, resolveItem } from './repos/services'
 import { createFavoritesRepo, type YoutubeFavorite } from './repos/favorites'
 import { createSettingsRepo } from './repos/settings'
+import { LiveController } from './live/liveController'
 import { strings } from './strings'
-import type { MediaKind, ServiceItemData, Settings } from '../shared/types'
+import type { LiveState, MediaKind, Overlay, ServiceItemData, Settings } from '../shared/types'
 
 registerMediaScheme()
 
 let db: Db | null = null
+
+/** envia a todas as janelas vivas */
+function broadcast(channel: string, payload: unknown): void {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload)
+}
 
 function rendererUrl(page: 'operator' | 'telao'): string | null {
   const base = process.env['ELECTRON_RENDERER_URL']
@@ -122,8 +128,25 @@ app.whenReady().then(() => {
   handle('settings:get', () => settings.get())
   handle('settings:update', (patch: Partial<Settings>) => settings.update(patch))
   settings.onChange((s) => {
-    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('settings:changed', s)
+    broadcast('settings:changed', s)
   })
+  const live = new LiveController({
+    services,
+    resolveDeps: { songs, media },
+    song: (id) => songs.get(id),
+    passage: (translation, ref) => bible.passage(translation, ref),
+    media,
+    settings,
+    send: (state: LiveState) => broadcast('live:state', state)
+  })
+  handle('live:get', () => live.get())
+  handle('live:goTo', (itemId: string, slideIndex: number) => live.goTo(itemId, slideIndex))
+  handle('live:next', () => live.next())
+  handle('live:prev', () => live.prev())
+  handle('live:setOverlay', (o: Overlay) => live.setOverlay(o))
+  handle('live:media', (cmd: { play?: boolean; volume?: number; position?: number }) => live.media(cmd))
+  handle('live:loadService', (serviceId: string) => live.loadService(serviceId))
+  handle('live:setOnline', (online: boolean) => live.setOnline(online))
   createOperatorWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createOperatorWindow()
