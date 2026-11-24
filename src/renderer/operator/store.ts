@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type Section = 'songs' | 'bible' | 'media' | 'notices' | 'services' | 'operation' | 'youtube' | 'settings'
+export type Section = 'songs' | 'bible' | 'media' | 'notices' | 'services' | 'sound' | 'operation' | 'youtube' | 'settings'
 
 interface OperatorState {
   section: Section

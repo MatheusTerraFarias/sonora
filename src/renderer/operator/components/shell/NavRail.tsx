@@ -11,7 +11,8 @@ interface Item {
 
 const MAIN: Item[] = [
   { section: 'operation', label: strings.nav.operation, icon: 'operation' },
-  { section: 'services', label: strings.nav.services, icon: 'services' }
+  { section: 'services', label: strings.nav.services, icon: 'services' },
+  { section: 'sound', label: strings.nav.sound, icon: 'sliders' }
 ]
 const LIBRARY: Item[] = [
   { section: 'songs', label: strings.nav.songs, icon: 'music' },

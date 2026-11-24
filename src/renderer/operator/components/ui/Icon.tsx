@@ -57,6 +57,13 @@ const PATHS = {
       <path d="m20 20-3.5-3.5" />
     </>
   ),
+  sliders: <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4" />,
+  mic: (
+    <>
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3" />
+    </>
+  ),
   plus: <path d="M5 12h14M12 5v14" />,
   listPlus: <path d="M11 12H3M16 6H3M16 18H3M18 9v6M21 12h-6" />,
   trash: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />,

@@ -13,6 +13,7 @@ import { Notices } from './screens/Notices'
 import { Operate } from './screens/Operate'
 import { Services } from './screens/Services'
 import { Songs } from './screens/Songs'
+import { Sound } from './screens/Sound'
 import { YouTube } from './screens/YouTube'
 import { useOperatorStore, watchOnlineStatus, type Section } from './store'
 
@@ -28,6 +29,8 @@ function Screen({ section }: { section: Section }): JSX.Element {
       return <Notices />
     case 'services':
       return <Services />
+    case 'sound':
+      return <Sound />
     case 'operation':
       return <Operate />
     case 'youtube':
