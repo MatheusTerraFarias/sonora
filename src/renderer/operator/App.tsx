@@ -6,6 +6,7 @@ import './components/shell/shell.css'
 import './screens/library.css'
 import { NavRail } from './components/shell/NavRail'
 import { TopBar } from './components/shell/TopBar'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Bible } from './screens/Bible'
 import { Settings } from './screens/Settings'
 import { Media } from './screens/Media'
@@ -30,7 +31,12 @@ function Screen({ section }: { section: Section }): JSX.Element {
     case 'services':
       return <Services />
     case 'sound':
-      return <Sound />
+      // erro na tela Som (medidores) fica contido nela; "Tentar de novo" remonta a tela
+      return (
+        <ErrorBoundary>
+          <Sound />
+        </ErrorBoundary>
+      )
     case 'operation':
       return <Operate />
     case 'youtube':

@@ -31,9 +31,14 @@ export function useMeters(channels: SoundChannel[]): {
 
   const notify = useCallback(() => {
     if (listeners.current.size === 0) return
-    const inputs = inputsRef.current
-    const readings = inputs ? bindChannels(channelsRef.current, inputs) : null
-    for (const cb of [...listeners.current]) cb(readings)
+    // nada daqui pode lançar para dentro do laço do motor
+    try {
+      const inputs = inputsRef.current
+      const readings = inputs ? bindChannels(channelsRef.current, inputs) : null
+      for (const cb of [...listeners.current]) cb(readings)
+    } catch (err) {
+      console.warn('[sonora] erro ao distribuir leituras do medidor:', err)
+    }
   }, [])
 
   useEffect(() => {

@@ -50,7 +50,10 @@ export const strings = {
     close: 'Fechar',
     weekdays: ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'],
     months: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-    edit: 'Editar'
+    edit: 'Editar',
+    screenErrorTitle: 'Esta tela parou por um erro',
+    screenErrorText: 'O resto da Sonora continua funcionando, inclusive o telão. Toque em Tentar de novo para reabrir a tela.',
+    retry: 'Tentar de novo'
   },
   addToService: {
     button: 'Adicionar ao culto',
@@ -268,6 +271,7 @@ export const strings = {
       unknown: 'Não foi possível ler o áudio. Toque em Tentar de novo ou escolha outro dispositivo.'
     },
     retry: 'Tentar de novo',
+    unsaved: 'Alterações do mapa ainda não salvas. Tentando de novo…',
     statusLabel: 'Estado da leitura',
     colNumber: 'Nº',
     colName: 'Canal',

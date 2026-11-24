@@ -24,6 +24,15 @@ const NO_CHANNELS: SoundChannel[] = []
 
 /** mapa escolhido sem culto: lembrado enquanto o app está aberto */
 let lastFreeMapId: ID | null = null
+/** depois de uma falha, tenta gravar de novo neste intervalo */
+const RETRY_SAVE_MS = 2000
+/**
+ * Edições ainda não gravadas, por mapa. Fica fora do componente: se a gravação ao sair da
+ * tela falhar, a edição continua aqui e é mesclada e regravada ao abrir a tela de novo.
+ */
+const pendingSaves = new Map<ID, SoundMap>()
+/** gravação em andamento (inclusive a do desmonte): a carga espera por ela para não ler dado velho */
+let inflightSave: Promise<unknown> = Promise.resolve()
 
 const renumber = (list: SoundChannel[]): SoundChannel[] => list.map((c, i) => (c.number === i + 1 ? c : { ...c, number: i + 1 }))
 
@@ -79,8 +88,12 @@ export function Sound(): JSX.Element {
 
   const mapsRef = useRef(maps)
   mapsRef.current = maps
-  const pending = useRef(new Map<ID, SoundMap>())
+  const pending = useRef(pendingSaves)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mounted = useRef(true)
+  const [unsaved, setUnsaved] = useState(false)
+  const unsavedRef = useRef(unsaved)
+  unsavedRef.current = unsaved
 
   // ---------- gravação com atraso (500 ms depois da última edição) ----------
   const flush = useCallback(async (): Promise<void> => {
@@ -88,7 +101,23 @@ export function Sound(): JSX.Element {
     timer.current = null
     const list = [...pending.current.values()]
     pending.current.clear()
-    for (const m of list) await safeRun(() => window.sonora.sound.save(m))
+    const run = (async (): Promise<void> => {
+      let failed = false
+      for (const m of list) {
+        const r = await safeRun(() => window.sonora.sound.save(m))
+        if (!r.ok) {
+          failed = true
+          // volta para a fila, a menos que já exista uma edição mais nova deste mapa
+          if (!pending.current.has(m.id)) pending.current.set(m.id, m)
+        }
+      }
+      if (!mounted.current) return
+      // aviso só depois de uma falha; some quando a fila esvazia
+      setUnsaved(failed || (pending.current.size > 0 && unsavedRef.current))
+      if (failed && !timer.current) timer.current = setTimeout(() => void flush(), RETRY_SAVE_MS)
+    })()
+    inflightSave = Promise.all([inflightSave, run]).catch(() => undefined)
+    await run
   }, [safeRun])
 
   const updateMap = useCallback(
@@ -108,12 +137,31 @@ export function Sound(): JSX.Element {
   )
 
   // grava o que faltar ao sair da tela
-  useEffect(() => () => void flush(), [flush])
+  useEffect(() => {
+    mounted.current = true
+    // sobrou edição de uma visita anterior (a gravação falhou): tenta de novo
+    if (pending.current.size > 0) {
+      setUnsaved(true)
+      timer.current = setTimeout(() => void flush(), SAVE_DELAY_MS)
+    }
+    return () => {
+      mounted.current = false
+      void flush()
+    }
+  }, [flush])
+
+  // o campo novo já recebeu o foco (autoFocus na montagem): não focar de novo depois
+  useEffect(() => {
+    if (focus) setFocus(null)
+  }, [focus])
 
   // ---------- carga ----------
   const loadMaps = useCallback(async (): Promise<SoundMap[] | null> => {
+    await inflightSave
     const r = await safeRun(() => window.sonora.sound.list())
     if (!r.ok) return null
+    // mapa apagado: a edição pendente dele não tem mais onde gravar
+    for (const id of [...pending.current.keys()]) if (!r.value.some((m) => m.id === id)) pending.current.delete(id)
     // edições ainda não gravadas continuam valendo
     const merged = r.value.map((m) => pending.current.get(m.id) ?? m)
     mapsRef.current = merged
@@ -403,7 +451,7 @@ export function Sound(): JSX.Element {
           </>
         }
       />
-      {(engineError || safe.error) && (
+      {(engineError || safe.error || unsaved) && (
         <div className="sound__alerts">
           {engineError && (
             <div className="sound-banner" role="alert">
@@ -418,7 +466,7 @@ export function Sound(): JSX.Element {
               )}
             </div>
           )}
-          {safe.error && <Notice tone="error">{strings.common.error}</Notice>}
+          {(safe.error || unsaved) && <Notice tone="error">{unsaved ? S.unsaved : strings.common.error}</Notice>}
         </div>
       )}
       <div className="sound__body">{body}</div>
