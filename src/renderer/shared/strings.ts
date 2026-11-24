@@ -270,6 +270,7 @@ export const strings = {
       disconnected: 'Confira o cabo USB da mesa. A leitura volta sozinha quando o dispositivo reaparecer.',
       unknown: 'Não foi possível ler o áudio. Toque em Tentar de novo ou escolha outro dispositivo.'
     },
+    noInputs: 'Nenhuma entrada atribuída. Escolha a entrada de pelo menos um canal para iniciar a leitura.',
     retry: 'Tentar de novo',
     unsaved: 'Alterações do mapa ainda não salvas. Tentando de novo…',
     statusLabel: 'Estado da leitura',

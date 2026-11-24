@@ -11,3 +11,8 @@ export function bindChannels(channels: SoundChannel[], inputs: InputReading[]): 
   }
   return out
 }
+
+/** A captura só vale a pena se pelo menos um canal tem entrada atribuída. */
+export function hasBoundInput(channels: SoundChannel[]): boolean {
+  return channels.some((c) => c.inputIndex !== null && c.inputIndex >= 0)
+}

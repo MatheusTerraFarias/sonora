@@ -158,6 +158,9 @@ export function createMeterEngine(deps: MeterEngineDeps): MeterEngine {
       stream = await deps.mediaDevices.getUserMedia({
         audio: {
           ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          // NUNCA ligar echoCancellation/noiseSuppression/autoGainControl: além de distorcer a medição,
+          // no Windows o processamento de voz pode abaixar (ducking) o volume dos outros apps, ou seja,
+          // o som do telão. A captura é só leitura e não pode afetar a projeção.
           channelCount: { ideal: 32 },
           echoCancellation: false,
           noiseSuppression: false,

@@ -18,7 +18,7 @@ export type ReadingsListener = (readings: ChannelReadings) => void
  * Os quadros (~30 Hz) NÃO passam pelo estado do React: quem desenha assina com `subscribe`
  * e escreve direto no DOM. Só `state` (mudança de estado do motor) re-renderiza.
  */
-export function useMeters(channels: SoundChannel[]): {
+export function useMeters(channels: SoundChannel[], enabled = true): {
   state: EngineState
   subscribe: (cb: ReadingsListener) => () => void
   retry: () => void
@@ -47,6 +47,11 @@ export function useMeters(channels: SoundChannel[]): {
   }, [channels, notify])
 
   useEffect(() => {
+    // sem canal com entrada atribuída não há o que medir: motor parado (e a placa livre)
+    if (!enabled) {
+      setState({ kind: 'idle' })
+      return
+    }
     // por execução do efeito: respostas atrasadas de uma montagem já desfeita (StrictMode) são ignoradas
     let alive = true
     const engine = createMeterEngine({
@@ -92,7 +97,7 @@ export function useMeters(channels: SoundChannel[]): {
       engine.stop()
       inputsRef.current = null
     }
-  }, [notify])
+  }, [notify, enabled])
 
   const subscribe = useCallback((cb: ReadingsListener) => {
     listeners.current.add(cb)

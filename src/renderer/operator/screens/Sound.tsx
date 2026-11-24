@@ -14,6 +14,7 @@ import { Icon } from '../components/ui/Icon'
 import { PanelHeader } from '../components/ui/PanelHeader'
 import { useSafe } from '../components/useSafe'
 import type { EngineState } from '../sound/meterEngine'
+import { hasBoundInput } from '../sound/bindChannels'
 import { useMeters } from '../sound/useMeters'
 import { useOperatorStore } from '../store'
 import './Sound.css'
@@ -101,7 +102,10 @@ export function Sound(): JSX.Element {
     timer.current = null
     const list = [...pending.current.values()]
     pending.current.clear()
+    const previous = inflightSave
     const run = (async (): Promise<void> => {
+      // uma gravação por vez: uma falha tardia não regrava versão velha por cima de uma nova já salva
+      await previous
       let failed = false
       for (const m of list) {
         const r = await safeRun(() => window.sonora.sound.save(m))
@@ -116,7 +120,7 @@ export function Sound(): JSX.Element {
       setUnsaved(failed || (pending.current.size > 0 && unsavedRef.current))
       if (failed && !timer.current) timer.current = setTimeout(() => void flush(), RETRY_SAVE_MS)
     })()
-    inflightSave = Promise.all([inflightSave, run]).catch(() => undefined)
+    inflightSave = run.catch(() => undefined)
     await run
   }, [safeRun])
 
@@ -149,6 +153,31 @@ export function Sound(): JSX.Element {
       void flush()
     }
   }, [flush])
+
+  // janela fechando (ou recarregando): dispara as gravações que faltam sem esperar ninguém.
+  // O envio do IPC é síncrono aqui; o main só encerra depois de a janela fechar, então a
+  // mensagem já saiu. Melhor esforço (se falhar, não há mais renderer para tentar de novo).
+  useEffect(() => {
+    const onUnload = (): void => {
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = null
+      const list = [...pending.current.values()]
+      pending.current.clear()
+      for (const m of list) {
+        try {
+          void Promise.resolve(window.sonora.sound.save(m)).catch(() => undefined)
+        } catch {
+          /* melhor esforço */
+        }
+      }
+    }
+    window.addEventListener('pagehide', onUnload)
+    window.addEventListener('beforeunload', onUnload)
+    return () => {
+      window.removeEventListener('pagehide', onUnload)
+      window.removeEventListener('beforeunload', onUnload)
+    }
+  }, [])
 
   // o campo novo já recebeu o foco (autoFocus na montagem): não focar de novo depois
   useEffect(() => {
@@ -204,12 +233,16 @@ export function Sound(): JSX.Element {
   const mapIdRef = useRef(mapId)
   mapIdRef.current = mapId
 
-  const meters = useMeters(map?.channels ?? NO_CHANNELS)
+  const channels = map?.channels ?? NO_CHANNELS
+  const bound = hasBoundInput(channels)
+  const meters = useMeters(channels, bound)
   const { state } = meters
 
   const selectMap = async (id: ID | null): Promise<void> => {
     if (serviceId) {
-      const r = await safeRun(() => window.sonora.sound.setForService(serviceId, { mapId: id }))
+      // outro mapa = outra passagem de som: os itens marcados do mapa antigo não valem mais
+      const changed = id !== (svc?.mapId ?? null)
+      const r = await safeRun(() => window.sonora.sound.setForService(serviceId, changed ? { mapId: id, checked: [] } : { mapId: id }))
       if (r.ok) setSvc(r.value)
     } else {
       lastFreeMapId = id
@@ -451,7 +484,7 @@ export function Sound(): JSX.Element {
           </>
         }
       />
-      {(engineError || safe.error || unsaved) && (
+      {(engineError || safe.error || unsaved || (map && !bound)) && (
         <div className="sound__alerts">
           {engineError && (
             <div className="sound-banner" role="alert">
@@ -466,6 +499,7 @@ export function Sound(): JSX.Element {
               )}
             </div>
           )}
+          {map && !bound && !engineError && <Notice>{S.noInputs}</Notice>}
           {(safe.error || unsaved) && <Notice tone="error">{unsaved ? S.unsaved : strings.common.error}</Notice>}
         </div>
       )}
