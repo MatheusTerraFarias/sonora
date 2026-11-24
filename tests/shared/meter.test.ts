@@ -87,3 +87,38 @@ test('lastSignalAt só avança com sinal acima do piso', () => {
   const t2 = stepTrack(t1, measure(sine(0.5)), 6000)
   expect(t2.lastSignalAt).toBe(6000)
 })
+
+test('segundo passo de decaimento continua de onde parou', () => {
+  const t0 = stepTrack(null, measure(Float32Array.of(10 ** (-3 / 20))), 0)
+  const t1500 = stepTrack(t0, measure(SILENT), 1500)
+  expect(t1500.peakDb).toBeCloseTo(-13, 1)
+  const t1600 = stepTrack(t1500, measure(SILENT), 1600)
+  expect(t1600.peakDb).toBeCloseTo(-15, 1)
+})
+
+test('novo pico mais alto durante o hold reinicia o hold', () => {
+  const t0 = stepTrack(null, measure(Float32Array.of(10 ** (-3 / 20))), 0)
+  const t500 = stepTrack(t0, measure(Float32Array.of(10 ** (-1 / 20))), 500)
+  expect(t500.peakDb).toBeCloseTo(-1, 1)
+  const t1400 = stepTrack(t500, measure(SILENT), 1400)
+  expect(t1400.peakDb).toBeCloseTo(-1, 1)
+})
+
+test('decaimento para em SILENCE_DB após muito tempo', () => {
+  const t0 = stepTrack(null, measure(Float32Array.of(10 ** (-3 / 20))), 0)
+  const t = stepTrack(t0, measure(SILENT), 10000)
+  expect(t.peakDb).toBe(SILENCE_DB)
+})
+
+test('decaimento não passa do pico medido no quadro atual', () => {
+  const quiet = measure(Float32Array.of(10 ** (-20 / 20)))
+  const t0 = stepTrack(null, measure(Float32Array.of(10 ** (-3 / 20))), 0)
+  const t = stepTrack(t0, quiet, 10000)
+  expect(t.peakDb).toBeCloseTo(-20, 1)
+})
+
+test('clip novo não encurta um clip já aceso', () => {
+  const prev = { peakDb: SILENCE_DB, peakAt: 0, clipUntil: 5000, lastSignalAt: 0 }
+  const t = stepTrack(prev, measure(Float32Array.of(0, 1, 0)), 1000)
+  expect(t.clipUntil).toBe(5000)
+})

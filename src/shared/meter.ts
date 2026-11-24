@@ -81,7 +81,7 @@ export function stepTrack(prev: MeterTrack | null, m: Measurement, now: number):
     }
   }
 
-  const clipUntil = m.clipped ? now + CLIP_HOLD_MS : base.clipUntil
+  const clipUntil = m.clipped ? Math.max(base.clipUntil, now + CLIP_HOLD_MS) : base.clipUntil
   const lastSignalAt = m.rmsDb > SILENCE_DB + 1 ? now : base.lastSignalAt
 
   return { peakDb, peakAt, clipUntil, lastSignalAt }
