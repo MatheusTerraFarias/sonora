@@ -16,6 +16,8 @@ export interface ProjectionWindowLike {
   moveTo(bounds: Bounds): void
   destroy(): void
   isDestroyed(): boolean
+  /** id do webContents (para regras de permissão) */
+  webContentsId?(): number
 }
 export interface ProjectionDeps {
   getDisplays(): DisplayLike[]

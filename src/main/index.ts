@@ -255,21 +255,26 @@ function start(): void {
   // Telão e qualquer outra coisa nesta sessão são negados; as webviews do YouTube têm sessão
   // própria com regras próprias (hardenWebviews: só tela cheia).
   const operatorId = (): number | null => (opWin.isDestroyed() ? null : opWin.webContents.id)
+  const projectionId = (): number | null => projection.window?.webContentsId?.() ?? null
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
     callback(
       allowMediaPermission({
         permission,
         requesterId: wc?.id ?? null,
         operatorId: operatorId(),
+        projectionId: projectionId(),
         mediaTypes: (details as { mediaTypes?: string[] }).mediaTypes
       })
     )
   })
+  // a verificação também libera o telão (media/áudio e speaker-selection): é o que autoriza o setSinkId
   session.defaultSession.setPermissionCheckHandler((wc, permission, _origin, details) =>
     allowMediaPermission({
       permission,
       requesterId: wc?.id ?? null,
       operatorId: operatorId(),
+      projectionId: projectionId(),
+      check: true,
       mediaType: (details as { mediaType?: string }).mediaType
     })
   )

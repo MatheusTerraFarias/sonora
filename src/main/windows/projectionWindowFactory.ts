@@ -47,6 +47,7 @@ export function createProjectionBrowserWindow(
       if (!win.isDestroyed()) win.hide()
       win.destroy()
     },
-    isDestroyed: () => win.isDestroyed()
+    isDestroyed: () => win.isDestroyed(),
+    webContentsId: () => win.webContents.id
   }
 }
