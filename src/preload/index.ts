@@ -6,6 +6,7 @@ import type { YoutubeFavorite } from '../main/repos/favorites'
 import type { OembedInfo } from '../main/youtube/session'
 import type { Passage } from '../shared/slides'
 import type { DisplayInfo } from '../shared/displays'
+import type { ServiceSound, SoundMap } from '../shared/sound'
 
 const call =
   (channel: string) =>
@@ -68,6 +69,19 @@ export const api = {
     removeItem: call('services:removeItem') as (itemId: ID) => Promise<void>,
     /** itens do culto resolvidos para exibição (título, `missing`) */
     resolve: call('services:resolve') as (serviceId: ID) => Promise<ResolvedItem[]>
+  },
+  sound: {
+    list: call('sound:list') as () => Promise<SoundMap[]>,
+    get: call('sound:get') as (id: ID) => Promise<SoundMap | null>,
+    create: call('sound:create') as (name: string) => Promise<SoundMap>,
+    save: call('sound:save') as (map: SoundMap) => Promise<SoundMap>,
+    duplicate: call('sound:duplicate') as (id: ID, name: string) => Promise<SoundMap>,
+    remove: call('sound:remove') as (id: ID) => Promise<void>,
+    getForService: call('sound:getForService') as (serviceId: ID) => Promise<ServiceSound>,
+    setForService: call('sound:setForService') as (
+      serviceId: ID,
+      patch: Partial<Omit<ServiceSound, 'serviceId'>>
+    ) => Promise<ServiceSound>
   },
   favorites: {
     list: call('favorites:list') as () => Promise<YoutubeFavorite[]>,

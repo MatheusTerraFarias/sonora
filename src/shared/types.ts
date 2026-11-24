@@ -127,4 +127,6 @@ export interface Settings {
   audioOutputDeviceId: string | null;
   adblockEnabled: boolean;
   updatesEnabled: boolean;
+  /** dispositivo de entrada de áudio do monitoramento de som; null = padrão do sistema */
+  soundInputDeviceId: string | null;
 }

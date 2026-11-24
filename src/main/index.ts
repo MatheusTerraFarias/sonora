@@ -10,6 +10,8 @@ import { handleMediaProtocol, registerMediaScheme } from './media/protocol'
 import { createServicesRepo, resolveItem } from './repos/services'
 import { createFavoritesRepo, type YoutubeFavorite } from './repos/favorites'
 import { createSettingsRepo } from './repos/settings'
+import { createSoundRepo } from './repos/sound'
+import type { ServiceSound, SoundMap } from '../shared/sound'
 import { LiveController } from './live/liveController'
 import { Connectivity, probeYoutube } from './connectivity'
 import { strings } from './strings'
@@ -190,6 +192,17 @@ function start(): void {
   handle('favorites:list', () => favorites.list())
   handle('favorites:add', (v: YoutubeFavorite) => favorites.add(v))
   handle('favorites:remove', (videoId: string) => favorites.remove(videoId))
+  const sound = createSoundRepo(db)
+  handle('sound:list', () => sound.list())
+  handle('sound:get', (id: string) => sound.get(id))
+  handle('sound:create', (name: string) => sound.create(name))
+  handle('sound:save', (map: SoundMap) => sound.save(map))
+  handle('sound:duplicate', (id: string, name: string) => sound.duplicate(id, name))
+  handle('sound:remove', (id: string) => sound.remove(id))
+  handle('sound:getForService', (serviceId: string) => sound.getForService(serviceId))
+  handle('sound:setForService', (serviceId: string, patch: Partial<Omit<ServiceSound, 'serviceId'>>) =>
+    sound.setForService(serviceId, patch)
+  )
   const settings = createSettingsRepo(db)
   handle('settings:get', () => settings.get())
   handle('settings:update', (patch: Partial<Settings>) => settings.update(patch))

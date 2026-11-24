@@ -16,4 +16,5 @@ export const DEFAULT_SETTINGS: Settings = {
   audioOutputDeviceId: null,
   adblockEnabled: false,
   updatesEnabled: false,
+  soundInputDeviceId: null,
 };

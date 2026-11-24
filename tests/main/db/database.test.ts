@@ -24,13 +24,15 @@ test('openDatabase cria todas as tabelas e é idempotente', () => {
       'service_items',
       'youtube_favorites',
       'settings',
+      'sound_maps',
+      'service_sound',
       'schema_version'
     ])
   )
   expect(db.pragma('foreign_keys', { simple: true })).toBe(1)
   expect(db.pragma('journal_mode', { simple: true })).toBe('wal')
   const versions = db.prepare('select version from schema_version').all()
-  expect(versions).toHaveLength(1)
+  expect(versions).toHaveLength(2)
   db.close()
 })
 

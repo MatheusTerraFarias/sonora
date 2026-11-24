@@ -74,5 +74,26 @@ CREATE TABLE settings (
   value TEXT NOT NULL
 );
 `
+  },
+  {
+    version: 2,
+    sql: `
+CREATE TABLE sound_maps (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  channels TEXT NOT NULL DEFAULT '[]',
+  checklist TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE service_sound (
+  service_id TEXT PRIMARY KEY REFERENCES services(id) ON DELETE CASCADE,
+  map_id TEXT REFERENCES sound_maps(id) ON DELETE SET NULL,
+  checked TEXT NOT NULL DEFAULT '[]',
+  channel_notes TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL
+);
+`
   }
 ]

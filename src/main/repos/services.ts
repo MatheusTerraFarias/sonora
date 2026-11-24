@@ -113,6 +113,11 @@ export function createServicesRepo(db: Db) {
           now
         )
         src.items.forEach((it, i) => insertItem(newId, i, it.data))
+        // som: leva só o mapa; checklist marcado e notas começam zerados a cada culto
+        db.prepare(
+          `INSERT INTO service_sound(service_id, map_id, checked, channel_notes, updated_at)
+           SELECT ?, map_id, '[]', '{}', ? FROM service_sound WHERE service_id = ?`
+        ).run(newId, now, id)
       })()
       return mustGet(newId)
     },
