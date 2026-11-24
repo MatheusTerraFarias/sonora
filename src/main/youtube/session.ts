@@ -1,4 +1,5 @@
-import { app, net, shell, type WebContents } from 'electron'
+import { app, net, session, shell, type WebContents } from 'electron'
+import { allowYoutubePermission } from './permissions'
 import { guestMayNavigate, isYoutubeUrl, parseVideoId, thumbnailUrl, YOUTUBE_PARTITION } from '../../shared/youtube'
 
 /** abre no navegador do sistema, só links http(s) */
@@ -18,6 +19,10 @@ export function openExternalSafe(url: string): void {
  * a janela que hospeda a webview pode abrir links no navegador (só o operador; o telão nunca).
  */
 export function hardenWebviews(opensLinks: (embedder: WebContents) => boolean): void {
+  // sessão do YouTube sem permissão alguma além de tela cheia (o padrão do Electron seria conceder tudo)
+  const yt = session.fromPartition(YOUTUBE_PARTITION)
+  yt.setPermissionRequestHandler((_wc, permission, callback) => callback(allowYoutubePermission(permission)))
+  yt.setPermissionCheckHandler((_wc, permission) => allowYoutubePermission(permission))
   app.on('web-contents-created', (_e, contents) => {
     if (contents.getType() === 'webview') return
     contents.on('will-attach-webview', (event, webPreferences, params) => {

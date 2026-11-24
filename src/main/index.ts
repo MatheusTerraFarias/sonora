@@ -252,7 +252,8 @@ function start(): void {
   operatorWindow = opWin
   opWin.on('closed', () => app.quit())
   // entrada de áudio (medidores da tela Som, somente leitura): só o operador, só áudio.
-  // Telão e webviews (partição própria, outra sessão) seguem sem permissão alguma.
+  // Telão e qualquer outra coisa nesta sessão são negados; as webviews do YouTube têm sessão
+  // própria com regras próprias (hardenWebviews: só tela cheia).
   const operatorId = (): number | null => (opWin.isDestroyed() ? null : opWin.webContents.id)
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
     callback(

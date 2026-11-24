@@ -168,10 +168,14 @@ export function createMeterEngine(deps: MeterEngineDeps): MeterEngine {
       if (gen !== generation) return
       opening = false
       const reason = mapError(err)
-      if (isRetry && reason !== 'permission') {
+      // dispositivo escolhido ausente (ex.: mesa desligada ao abrir a tela): volta sozinho quando reaparecer
+      const missing = reason === 'not-found' && deviceId !== null
+      if ((isRetry && reason !== 'permission') || missing) {
         // segue desconectado; o laço tenta de novo em 3 s
         lastAttemptAt = deps.now()
-        setState({ kind: 'error', reason: 'disconnected' })
+        if (!(state.kind === 'error' && state.reason === 'disconnected')) setState({ kind: 'error', reason: 'disconnected' })
+        listenDevices(true)
+        armFrame()
         return
       }
       wanted = reason === 'permission' ? false : wanted
@@ -185,10 +189,11 @@ export function createMeterEngine(deps: MeterEngineDeps): MeterEngine {
       return
     }
     opening = false
+    let context: AudioContext | null = null
     try {
       const track = stream.getAudioTracks()[0]
       const inputCount = Math.max(1, track.getSettings().channelCount ?? 1)
-      const context = deps.createContext()
+      context = deps.createContext()
       if (context.state === 'suspended') void context.resume().catch(() => undefined)
       const source = context.createMediaStreamSource(stream)
       const splitter = context.createChannelSplitter(inputCount)
@@ -220,6 +225,7 @@ export function createMeterEngine(deps: MeterEngineDeps): MeterEngine {
       console.warn('[sonora] falha ao montar o medidor:', err)
       for (const t of stream.getTracks()) t.stop()
       releaseSession()
+      void context?.close().catch(() => undefined)
       setState({ kind: 'error', reason: 'unknown' })
     }
   }

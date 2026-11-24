@@ -160,7 +160,7 @@ test('outros erros do getUserMedia', async () => {
     gumError = name
     const e = makeEngine()
     const { states } = collect(e)
-    await e.start('mesa')
+    await e.start(null)
     expect(states.at(-1)).toEqual({ kind: 'error', reason })
   }
 })
@@ -314,6 +314,60 @@ test('stop enquanto getUserMedia está pendente solta o fluxo', async () => {
   await p
   expect(tracks[0].stopped).toBe(true)
   expect(contexts).toHaveLength(0)
+})
+
+test('dispositivo escolhido ausente ao abrir: disconnected e volta sozinho', async () => {
+  gumError = 'NotFoundError'
+  const e = makeEngine()
+  const { states } = collect(e)
+  await e.start('mesa')
+  expect(states.at(-1)).toEqual({ kind: 'error', reason: 'disconnected' })
+  gumError = null
+  frame(3100)
+  await flush()
+  expect(states.at(-1)).toMatchObject({ kind: 'running' })
+  e.stop()
+})
+
+test('sem dispositivo escolhido, not-found continua not-found', async () => {
+  gumError = 'NotFoundError'
+  const e = makeEngine()
+  const { states } = collect(e)
+  await e.start(null)
+  expect(states.at(-1)).toEqual({ kind: 'error', reason: 'not-found' })
+})
+
+test('retentativas que falham não repetem o mesmo estado de erro', async () => {
+  const e = makeEngine()
+  const { states } = collect(e)
+  await e.start('mesa')
+  tracks[0].end()
+  gumError = 'NotFoundError'
+  const before = states.length
+  frame(3100)
+  await flush()
+  frame(3100)
+  await flush()
+  expect(gumCalls).toHaveLength(3)
+  expect(states.length).toBe(before)
+  e.stop()
+})
+
+test('falha ao montar o grafo fecha o contexto e solta o fluxo', async () => {
+  const e = makeEngine()
+  const { states } = collect(e)
+  const orig = FakeContext.prototype.createChannelSplitter
+  FakeContext.prototype.createChannelSplitter = () => {
+    throw new Error('boom')
+  }
+  try {
+    await e.start('mesa')
+  } finally {
+    FakeContext.prototype.createChannelSplitter = orig
+  }
+  expect(states.at(-1)).toEqual({ kind: 'error', reason: 'unknown' })
+  expect(contexts[0].closed).toBe(true)
+  expect(tracks[0].stopped).toBe(true)
 })
 
 const ch = (id: string, inputIndex: number | null) => ({ id, inputIndex }) as SoundChannel

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ID } from '../../../shared/types'
 import type { SoundChannel } from '../../../shared/sound'
 import { createMeterEngine, type EngineState, type InputReading } from './meterEngine'
@@ -17,10 +17,10 @@ export function useMeters(channels: SoundChannel[]): {
 } {
   const [state, setState] = useState<EngineState>({ kind: 'idle' })
   const [inputs, setInputs] = useState<InputReading[]>([])
-  const alive = useRef(true)
 
   useEffect(() => {
-    alive.current = true
+    // por execução do efeito: respostas atrasadas de uma montagem já desfeita (StrictMode) são ignoradas
+    let alive = true
     const engine = createMeterEngine({
       mediaDevices: navigator.mediaDevices,
       createContext: () => new AudioContext(),
@@ -31,11 +31,11 @@ export function useMeters(channels: SoundChannel[]): {
       }
     })
     const offState = engine.onState((s) => {
-      if (!alive.current) return
+      if (!alive) return
       setState(s)
       if (s.kind !== 'running') setInputs([])
     })
-    const offFrame = engine.onFrame((f) => alive.current && setInputs(f))
+    const offFrame = engine.onFrame((f) => alive && setInputs(f))
     let current: string | null | undefined
     const apply = (id: string | null): void => {
       if (id === current) return
@@ -44,11 +44,11 @@ export function useMeters(channels: SoundChannel[]): {
     }
     window.sonora.settings
       .get()
-      .then((s) => alive.current && apply(s.soundInputDeviceId))
-      .catch(() => alive.current && apply(null))
-    const offSettings = window.sonora.settings.onChange((s) => alive.current && apply(s.soundInputDeviceId))
+      .then((s) => alive && apply(s.soundInputDeviceId))
+      .catch(() => alive && apply(null))
+    const offSettings = window.sonora.settings.onChange((s) => alive && apply(s.soundInputDeviceId))
     return () => {
-      alive.current = false
+      alive = false
       offSettings()
       offFrame()
       offState()
