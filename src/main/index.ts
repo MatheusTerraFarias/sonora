@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, net, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, screen, session } from 'electron'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { openDatabase, type Db } from './db/database'
@@ -19,6 +19,7 @@ import { createOperatorWindow } from './windows/operatorWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
 import { createProjectionBrowserWindow } from './windows/projectionWindowFactory'
 import { isAppUrl } from './windows/navigationGuard'
+import { allowMediaPermission } from './windows/mediaPermission'
 import { cleanupRestoreLeftovers, exportBackup, restoreBackup } from './backup'
 import { initUpdater } from './updater'
 import { identifyDisplays } from './windows/identifyWindows'
@@ -250,6 +251,27 @@ function start(): void {
   operatorWin = opWin
   operatorWindow = opWin
   opWin.on('closed', () => app.quit())
+  // entrada de áudio (medidores da tela Som, somente leitura): só o operador, só áudio.
+  // Telão e webviews (partição própria, outra sessão) seguem sem permissão alguma.
+  const operatorId = (): number | null => (opWin.isDestroyed() ? null : opWin.webContents.id)
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
+    callback(
+      allowMediaPermission({
+        permission,
+        requesterId: wc?.id ?? null,
+        operatorId: operatorId(),
+        mediaTypes: (details as { mediaTypes?: string[] }).mediaTypes
+      })
+    )
+  })
+  session.defaultSession.setPermissionCheckHandler((wc, permission, _origin, details) =>
+    allowMediaPermission({
+      permission,
+      requesterId: wc?.id ?? null,
+      operatorId: operatorId(),
+      mediaType: (details as { mediaType?: string }).mediaType
+    })
+  )
   // progresso de reprodução informado pelo telão: só repassado ao operador (não altera LiveState.position)
   ipcMain.on('live:progress', (event, p: LiveProgress) => {
     if (event.sender === opWin.webContents || opWin.isDestroyed() || !p || typeof p.key !== 'string') return
